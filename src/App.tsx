@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { FileText, Upload, Download, Plus, ChevronRight } from 'lucide-react';
+import logo from './assets/altairium-logo.png';
 
 export default function GrantWritingTool() {
   const [activeSection, setActiveSection] = useState('information');
@@ -127,9 +128,9 @@ export default function GrantWritingTool() {
         <div className="px-4 mb-6">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center">
-              <span className="text-black font-bold text-xl">A</span>
+              <img src={logo} alt="Altairium Logo" className="w-6 h-6" />
             </div>
-            <span className="text-white font-semibold text-lg">GrantAI</span>
+            <span className="text-white font-semibold text-lg">Altairium</span>
           </div>
         </div>
 
