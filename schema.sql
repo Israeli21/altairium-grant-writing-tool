@@ -96,11 +96,5 @@ CREATE TABLE generation_logs (
   created_at TIMESTAMP DEFAULT now()
 );
 
-
--- Example of how this would be retreived
-SELECT content, source_type, source_id
-FROM document_embeddings
-WHERE grant_id = 'current-grant-uuid'
-ORDER BY embedding <-> embedding('user_query_vector')
-LIMIT 5;
-
+-- Index for faster vector similarity search (uncomment after data is inserted)
+-- CREATE INDEX ON document_embeddings USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);

@@ -1,8 +1,11 @@
 import React, { useState } from 'react';
-import { FileText, Upload, Download, Plus, ChevronRight } from 'lucide-react';
+import { FileText, Upload, Download, Plus, ChevronRight, LogOut } from 'lucide-react';
+import { useAuth } from './contexts/AuthContext';
+import LoginPage from './components/LoginPage';
 import logo from './assets/altairium-logo.png';
 
 export default function GrantWritingTool() {
+  const { session, user, loading, signOut } = useAuth();
   const [activeSection, setActiveSection] = useState('information');
   const [grantInfo, setGrantInfo] = useState({
     nonprofitName: '',
@@ -10,6 +13,23 @@ export default function GrantWritingTool() {
     fundingAmount: ''
   });
   const [isGenerating, setIsGenerating] = useState(false);
+
+  // Show loading while checking authentication
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show login page if not authenticated
+  if (!session || !user) {
+    return <LoginPage />;
+  }
   
   // TODO: Add state for file uploads
   // const [files, setFiles] = useState({
@@ -158,9 +178,23 @@ export default function GrantWritingTool() {
         <div className="px-3 mt-auto border-t border-gray-800 pt-4">
           <div className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-900 cursor-pointer transition-colors">
             <div className="w-8 h-8 bg-gray-700 rounded-full flex items-center justify-center text-white font-semibold text-sm">
-              JD
+              {user.email?.charAt(0).toUpperCase() || 'U'}
             </div>
-            <span className="text-white text-sm font-medium">John Doe</span>
+            <div className="flex-1 min-w-0">
+              <span className="text-white text-sm font-medium block truncate">
+                {user.user_metadata?.full_name || user.email?.split('@')[0] || 'User'}
+              </span>
+              <span className="text-gray-400 text-xs block truncate">
+                {user.email}
+              </span>
+            </div>
+            <button
+              onClick={signOut}
+              className="p-1 text-gray-400 hover:text-white transition-colors"
+              title="Sign Out"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
           </div>
         </div>
       </div>
