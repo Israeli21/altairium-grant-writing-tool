@@ -60,15 +60,15 @@ npm run preview
 
 ```
 altairium-grant-writing-tool/
-├── public/           # Static assets
+├── public/            # Static assets
 ├── src/
-│   ├── App.tsx      # Main application component
-│   ├── main.tsx     # Application entry point
-│   └── index.css    # Global styles with Tailwind directives
-├── index.html       # HTML template
-├── package.json     # Dependencies and scripts
-├── tsconfig.json    # TypeScript configuration
-├── vite.config.ts   # Vite configuration
+│   ├── App.tsx        # Main application component
+│   ├── main.tsx       # Application entry point
+│   └── index.css      # Global styles with Tailwind directives
+├── index.html         # HTML template
+├── package.json       # Dependencies and scripts
+├── tsconfig.json      # TypeScript configuration
+├── vite.config.ts     # Vite configuration
 └── tailwind.config.js # Tailwind CSS configuration
 ```
 
