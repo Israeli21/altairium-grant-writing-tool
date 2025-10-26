@@ -19,63 +19,123 @@ export type Database = {
           id: string
           email: string | null
           full_name: string | null
+          nonprofit_name: string | null
           created_at: string
         }
         Insert: {
           id: string
           email?: string | null
           full_name?: string | null
+          nonprofit_name?: string | null
           created_at?: string
         }
         Update: {
           id?: string
           email?: string | null
           full_name?: string | null
+          nonprofit_name?: string | null
           created_at?: string
         }
       }
-      grant_applications: {
+
+      grants: {
         Row: {
           id: string
           user_id: string
-          organization_name: string | null
-          project_title: string | null
+          nonprofit_name: string
           grantor_name: string | null
           funding_amount: number | null
-          project_description: string | null
-          grant_opportunity_url: string | null
-          structure_type: string | null
+          proposal_type: 'standard' | 'federal' | 'foundation' | null
+          status: string | null
           created_at: string
           updated_at: string
         }
         Insert: {
           id?: string
           user_id: string
-          organization_name?: string | null
-          project_title?: string | null
+          nonprofit_name: string
           grantor_name?: string | null
           funding_amount?: number | null
-          project_description?: string | null
-          grant_opportunity_url?: string | null
-          structure_type?: string | null
+          proposal_type?: 'standard' | 'federal' | 'foundation' | null
+          status?: string | null
           created_at?: string
           updated_at?: string
         }
         Update: {
           id?: string
           user_id?: string
-          organization_name?: string | null
-          project_title?: string | null
+          nonprofit_name?: string
           grantor_name?: string | null
           funding_amount?: number | null
-          project_description?: string | null
-          grant_opportunity_url?: string | null
-          structure_type?: string | null
+          proposal_type?: 'standard' | 'federal' | 'foundation' | null
+          status?: string | null
           created_at?: string
           updated_at?: string
         }
       }
-      // Add other table types as needed
+
+      uploaded_documents: {
+        Row: {
+          id: string
+          grant_id: string
+          user_id: string
+          file_name: string
+          file_type: 'form_990' | 'form_1023' | 'past_projects'
+          file_url: string
+          extracted_text: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          grant_id: string
+          user_id: string
+          file_name: string
+          file_type: 'form_990' | 'form_1023' | 'past_projects'
+          file_url: string
+          extracted_text?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          grant_id?: string
+          user_id?: string
+          file_name?: string
+          file_type?: 'form_990' | 'form_1023' | 'past_projects'
+          file_url?: string
+          extracted_text?: string | null
+          created_at?: string
+        }
+      }
+
+      document_embeddings: {
+        Row: {
+          id: string
+          document_id: string
+          grant_id: string
+          user_id: string
+          content: string
+          embedding: number[] | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          document_id: string
+          grant_id: string
+          user_id: string
+          content: string
+          embedding?: number[] | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          document_id?: string
+          grant_id?: string
+          user_id?: string
+          content?: string
+          embedding?: number[] | null
+          created_at?: string
+        }
+      }
     }
   }
 }
