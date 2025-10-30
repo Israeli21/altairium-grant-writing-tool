@@ -36,11 +36,6 @@ def scrape_pdf(request: PDFRequest):
         
         results.append({"url": url, "form_type": formType, "data": data})
 
-    
-
-    
-    
-    # Clearning text (making embeddings less computationally heavy)
 
 
 
@@ -203,8 +198,3 @@ def summarize_allocation(text: str):
     for program, pct in re.findall(r"(NEWSROOM|WRITING SEMINARS|PUBLIC FORUMS).*?(\d{1,2} ?%)", text.upper()):
         alloc[program.title()] = pct
     return alloc
-
-
-
-
-
