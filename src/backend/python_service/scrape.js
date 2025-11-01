@@ -19,6 +19,9 @@ async function fetchDocuments(limit = 5){
     .from('uploaded_documents')
     .select('id, file_name, file_url, file_type, extracted_text')
     .is('extracted_text', null)
+
+    if(error) error
+    return data
 }
 // Step 2: Send PDFs to python microservice
 async function sendToService(urls){
