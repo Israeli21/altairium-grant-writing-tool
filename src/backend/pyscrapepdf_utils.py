@@ -1,6 +1,8 @@
 """
 pyscrapepdf_utils.py
 Lightweight FastAPI service for scraping and cleaning text from PDFs
+
+Created by Shrish Vishnu Rajesh Kumar on 11/5/2025
 """
 
 from fastapi import FastAPI
@@ -35,6 +37,7 @@ def scrape_pdf(request: PDFRequest):
             data = parseGeneric(pdfBytes)
         
         results.append({"url": url, "form_type": formType, "data": data})
+    return results
 
 
 
