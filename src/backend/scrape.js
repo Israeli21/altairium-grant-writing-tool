@@ -65,7 +65,7 @@ async function processBatch() {
     const urls = documents.map(d => d.file_url)
     console.log("Sending to scraper:", urls)
 
-    const results = await sendToScraper(urls)
+    const results = await sendToService(urls)
     console.log("Scraper results:", results)
 
     await storeResults(results)
