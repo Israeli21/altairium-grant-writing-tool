@@ -7,11 +7,11 @@ import os
 
 
 # Model information
-model_id = "sentence-transformers/all-MiniLM-L6-v2"
+model_id = "google/embeddinggemma-300m"
 hf_token = os.getenv("HUGGINGFACE_TOKEN")
 
 # Testing the model
-client = InferenceClient(model="sentence-transformers/all-MiniLM-L6-v2", token=hf_token)
+client = InferenceClient(model=model_id, token=hf_token)
 
 # Pydantic object
 class EmbeddingRequest(BaseModel):
@@ -19,6 +19,18 @@ class EmbeddingRequest(BaseModel):
 
 app = FastAPI()
 
+
 @app.post("/embed")
 def generate_embeddings(request: EmbeddingRequest):
-    return client.feature_extraction(request.content)
+    """
+    Generate embeddings for a given text using google/embedding-gemma-300m.
+    """
+    try:
+        embedding = client.feature_extraction(request.content)
+
+        if not isinstance(embedding, list):
+            embedding = embedding.tolist()
+
+        return {"embedding": embedding}
+    except Exception as e:
+        return {"error": str(e)}
