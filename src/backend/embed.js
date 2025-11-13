@@ -13,13 +13,12 @@ const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SER
 const PYTHON_EMBED_URL = "http://localhost:8000/embed"
 
 // Fetching text to convert
-async function fetchText(){
+async function fetchText(uploaded_document_id){
     const {data, error} = await supabase
     .from('uploaded_documents')
     .select('extracted_text')
     .eq('id', uploaded_document_id)
     .single()
-    if (error) error
     if (error){
         console.error("Error fetching text: ", error)
         throw error;
@@ -36,21 +35,21 @@ async function sendToService(extracted_text){
             content: extracted_text
         })
     })
-    return await response.json
+    return await response.json()
 }
 
 async function storeResults(results){
-    for (const result in results){
+    for (const result of results){
         const {embedding, text} = result
         const {error} = await supabase
         .from('document_embeddings')
-        .update({
+        .insert({
             content: text,
             embedding: embedding,
             created_at: new Date()
         })
 
-        if (error) console.error('Failed to update ${url}:', error)
+        if (error) console.error('Failed to update: ', error)
     }
 }
 
