@@ -28,18 +28,45 @@ async function fetchText(){
     return data.extracted_text
 }
 
-async function sendToService(data){
+async function sendToService(extracted_text){
     const response = await fetch(PYTHON_EMBED_URL, {
         method: "POST",
         headers: {"Content-Type" : "application/json"},
         body: JSON.stringify({
-            content: data
+            content: extracted_text
         })
     })
+    return await response.json
 }
-/*
-working on this
-async function storeResults(){
 
+async function storeResults(results){
+    for (const result in results){
+        const {embedding, text} = result
+        const {error} = await supabase
+        .from('document_embeddings')
+        .update({
+            content: text,
+            embedding: embedding,
+            created_at: new Date()
+        })
+
+        if (error) console.error('Failed to update ${url}:', error)
+    }
 }
-*/
+
+// Main orchestration
+
+async function createEmbeddings(uploaded_document_id) {
+    try {
+    
+    const text = await fetchText(uploaded_document_id);
+
+    const result = await sendToService(text);
+
+    await storeResults(result, uploaded_document_id);
+
+    console.log(`Embedding created for document ${uploaded_document_id}`);
+  } catch (err) {
+    console.error("Failed to create embedding:", err);
+  }
+}

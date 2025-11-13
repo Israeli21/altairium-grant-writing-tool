@@ -31,6 +31,6 @@ def generate_embeddings(request: EmbeddingRequest):
         if not isinstance(embedding, list):
             embedding = embedding.tolist()
 
-        return {"embedding": embedding}
+        return {"embedding": embedding, "text" : request.content}
     except Exception as e:
         return {"error": str(e)}
