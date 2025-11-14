@@ -10,7 +10,8 @@ export default function GrantWritingTool() {
   const [grantInfo, setGrantInfo] = useState({
     nonprofitName: '',
     grantorName: '',
-    fundingAmount: ''
+    fundingAmount: '',
+    additionalNotes: ''
   });
   const [isGenerating, setIsGenerating] = useState(false);
 
@@ -268,6 +269,16 @@ export default function GrantWritingTool() {
                       placeholder="$0"
                       value={grantInfo.fundingAmount}
                       onChange={(e) => setGrantInfo({...grantInfo, fundingAmount: e.target.value})}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Additional Notes</label>
+                    <textarea
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="Any additional information about your grant application"
+                      value={grantInfo.additionalNotes}
+                      onChange={(e) => setGrantInfo({...grantInfo, additionalNotes: e.target.value})}
                     />
                   </div>
 
