@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { FileText, Upload, Download, Plus, ChevronRight, LogOut } from 'lucide-react';
+import { FileText, Upload, Download, Plus, ChevronRight, LogOut, X } from 'lucide-react';
 import { useAuth } from './contexts/AuthContext';
 import LoginPage from './components/LoginPage';
 import logo from './assets/altairium-logo.png';
+// import { supabase } from './lib/supabase';
 
 export default function GrantWritingTool() {
   const { session, user, loading, signOut } = useAuth();
@@ -14,6 +15,16 @@ export default function GrantWritingTool() {
     additionalNotes: ''
   });
   const [isGenerating, setIsGenerating] = useState(false);
+  const [files, setFiles] = useState({
+    form990: null as File | null,
+    form1023: null as File | null,
+    pastProjects: [] as File[]
+  });
+  const [uploadingFiles, setUploadingFiles] = useState({
+    form990: false,
+    form1023: false,
+    pastProjects: false
+  });
 
   // Show loading while checking authentication
   if (loading) {
@@ -298,32 +309,142 @@ export default function GrantWritingTool() {
                   <div className="space-y-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">IRS Form 990</label>
-                      {/* TODO: Wire up handleFileUpload('form990', file) on file selection */}
-                      <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-blue-500 transition-colors cursor-pointer">
-                        <Upload className="w-6 h-6 text-gray-400 mx-auto mb-2" />
-                        <p className="text-sm text-gray-600">Upload Form 990</p>
-                        <p className="text-xs text-gray-500 mt-1">PDF up to 10MB</p>
-                      </div>
+                      {files.form990 ? (
+                        <div className="border border-gray-300 rounded-lg p-4 flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <FileText className="w-5 h-5 text-blue-600" />
+                            <span className="text-sm text-gray-700">{files.form990.name}</span>
+                          </div>
+                          <button
+                            onClick={() => handleRemoveFile('form990')}
+                            className="p-1 text-red-600 hover:text-red-700"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ) : (
+                        <label className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-blue-500 transition-colors cursor-pointer block">
+                          <input
+                            type="file"
+                            accept=".pdf"
+                            className="hidden"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) handleFileUpload('form990', file);
+                            }}
+                            disabled={uploadingFiles.form990}
+                          />
+                          {uploadingFiles.form990 ? (
+                            <>
+                              <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
+                              <p className="text-sm text-gray-600">Uploading...</p>
+                            </>
+                          ) : (
+                            <>
+                              <Upload className="w-6 h-6 text-gray-400 mx-auto mb-2" />
+                              <p className="text-sm text-gray-600">Upload Form 990</p>
+                              <p className="text-xs text-gray-500 mt-1">PDF up to 10MB</p>
+                            </>
+                          )}
+                        </label>
+                      )}
                     </div>
 
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">IRS Form 1023</label>
-                      {/* TODO: Wire up handleFileUpload('form1023', file) on file selection */}
-                      <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-blue-500 transition-colors cursor-pointer">
-                        <Upload className="w-6 h-6 text-gray-400 mx-auto mb-2" />
-                        <p className="text-sm text-gray-600">Upload Form 1023</p>
-                        <p className="text-xs text-gray-500 mt-1">PDF up to 10MB</p>
-                      </div>
+                      {files.form1023 ? (
+                        <div className="border border-gray-300 rounded-lg p-4 flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <FileText className="w-5 h-5 text-blue-600" />
+                            <span className="text-sm text-gray-700">{files.form1023.name}</span>
+                          </div>
+                          <button
+                            onClick={() => handleRemoveFile('form1023')}
+                            className="p-1 text-red-600 hover:text-red-700"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ) : (
+                        <label className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-blue-500 transition-colors cursor-pointer block">
+                          <input
+                            type="file"
+                            accept=".pdf"
+                            className="hidden"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) handleFileUpload('form1023', file);
+                            }}
+                            disabled={uploadingFiles.form1023}
+                          />
+                          {uploadingFiles.form1023 ? (
+                            <>
+                              <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
+                              <p className="text-sm text-gray-600">Uploading...</p>
+                            </>
+                          ) : (
+                            <>
+                              <Upload className="w-6 h-6 text-gray-400 mx-auto mb-2" />
+                              <p className="text-sm text-gray-600">Upload Form 1023</p>
+                              <p className="text-xs text-gray-500 mt-1">PDF up to 10MB</p>
+                            </>
+                          )}
+                        </label>
+                      )}
                     </div>
 
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">Past Projects and Fundraisers</label>
-                      {/* TODO: Wire up handleFileUpload('pastProjects', file) on file selection - allow multiple */}
-                      <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-blue-500 transition-colors cursor-pointer">
-                        <Upload className="w-6 h-6 text-gray-400 mx-auto mb-2" />
-                        <p className="text-sm text-gray-600">Upload project documents</p>
-                        <p className="text-xs text-gray-500 mt-1">PDF, DOCX up to 10MB each</p>
-                      </div>
+                      <label className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-blue-500 transition-colors cursor-pointer block">
+                        <input
+                          type="file"
+                          accept=".pdf,.docx"
+                          multiple
+                          className="hidden"
+                          onChange={(e) => {
+                            const fileList = e.target.files;
+                            if (fileList) {
+                              Array.from(fileList).forEach(file => {
+                                handleFileUpload('pastProjects', file);
+                              });
+                            }
+                          }}
+                          disabled={uploadingFiles.pastProjects}
+                        />
+                        {uploadingFiles.pastProjects ? (
+                          <>
+                            <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
+                            <p className="text-sm text-gray-600">Uploading...</p>
+                          </>
+                        ) : (
+                          <>
+                            <Upload className="w-6 h-6 text-gray-400 mx-auto mb-2" />
+                            <p className="text-sm text-gray-600">Upload project documents</p>
+                            <p className="text-xs text-gray-500 mt-1">PDF, DOCX up to 10MB each</p>
+                          </>
+                        )}
+                      </label>
+                      {files.pastProjects.length > 0 && (
+                        <div className="mt-3 space-y-2">
+                          {files.pastProjects.map((file, index) => (
+                            <div key={index} className="border border-gray-300 rounded-lg p-3 flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <FileText className="w-4 h-4 text-blue-600" />
+                                <span className="text-sm text-gray-700">{file.name}</span>
+                              </div>
+                              <button
+                                onClick={() => {
+                                  const newPastProjects = files.pastProjects.filter((_, i) => i !== index);
+                                  setFiles({ ...files, pastProjects: newPastProjects });
+                                }}
+                                className="p-1 text-red-600 hover:text-red-700"
+                              >
+                                <X className="w-4 h-4" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
