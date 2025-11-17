@@ -3,7 +3,7 @@ import { FileText, Upload, Download, Plus, ChevronRight, LogOut, X } from 'lucid
 import { useAuth } from './contexts/AuthContext';
 import LoginPage from './components/LoginPage';
 import logo from './assets/altairium-logo.png';
-// import { supabase } from './lib/supabase';
+import { supabase } from './lib/supabase';
 
 export default function GrantWritingTool() {
   const { session, user, loading, signOut } = useAuth();
@@ -25,6 +25,17 @@ export default function GrantWritingTool() {
     form1023: false,
     pastProjects: false
   });
+  const [uploadedFileUrls, setUploadedFileUrls] = useState<{
+    form990: string | null;
+    form1023: string | null;
+    pastProjects: string[];
+  }>({
+    form990: null,
+    form1023: null,
+    pastProjects: []
+  });
+  const [grantApplicationId, setGrantApplicationId] = useState<string | null>(null);
+  const [processingData, setProcessingData] = useState(false);
 
   // Show loading while checking authentication
   if (loading) {
@@ -42,116 +53,172 @@ export default function GrantWritingTool() {
   if (!session || !user) {
     return <LoginPage />;
   }
-  
-  // TODO: Add state for file uploads
-  // const [files, setFiles] = useState({
-  //   form990: null,
-  //   form1023: null,
-  //   pastProjects: []
-  // });
-  
-  // TODO: Add state for generated proposal
-  // const [generatedProposal, setGeneratedProposal] = useState(null);
-  
-  // TODO: Add state for saved drafts
-  // const [savedDrafts, setSavedDrafts] = useState([]);
 
-  // TODO: GET - Load saved drafts when component mounts
-  // useEffect(() => {
-  //   const loadSavedDrafts = async () => {
-  //     try {
-  //       const response = await fetch('/api/drafts');
-  //       const data = await response.json();
-  //       setSavedDrafts(data.drafts);
-  //     } catch (error) {
-  //       console.error('Failed to load drafts:', error);
-  //     }
-  //   };
-  //   loadSavedDrafts();
-  // }, []);
+  // Handle file upload to Supabase Storage
+  const handleFileUpload = async (fileType: 'form990' | 'form1023' | 'pastProjects', file: File) => {
+    if (!user) return;
+
+    setUploadingFiles({ ...uploadingFiles, [fileType]: true });
+
+    try {
+      // Create a unique file path: user-id/file-type/filename
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
+      const filePath = `${user.id}/${fileType}/${fileName}`;
+
+      // Upload file to Supabase Storage bucket
+      const { data, error } = await supabase.storage
+        .from('grant-documents')
+        .upload(filePath, file, {
+          cacheControl: '3600',
+          upsert: false
+        });
+
+      if (error) throw error;
+
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('grant-documents')
+        .getPublicUrl(filePath);
+
+      // Update state with the uploaded file and URL
+      if (fileType === 'pastProjects') {
+        setFiles({ ...files, pastProjects: [...files.pastProjects, file] });
+        setUploadedFileUrls({ ...uploadedFileUrls, pastProjects: [...uploadedFileUrls.pastProjects, publicUrl] });
+      } else {
+        setFiles({ ...files, [fileType]: file });
+        setUploadedFileUrls({ ...uploadedFileUrls, [fileType]: publicUrl });
+      }
+
+      console.log(`✅ ${file.name} uploaded successfully to Supabase!`);
+    } catch (error: any) {
+      console.error('Upload failed:', error);
+      alert(`Upload failed: ${error.message}`);
+    } finally {
+      setUploadingFiles({ ...uploadingFiles, [fileType]: false });
+    }
+  };
+
+  // Remove file from state and Supabase
+  const handleRemoveFile = async (fileType: 'form990' | 'form1023', index?: number) => {
+    if (!user) return;
+
+    try {
+      // Delete from Supabase Storage
+      if (fileType === 'pastProjects' && index !== undefined) {
+        const fileUrl = uploadedFileUrls.pastProjects[index];
+        if (fileUrl) {
+          const filePath = fileUrl.split('/grant-documents/')[1];
+          await supabase.storage.from('grant-documents').remove([filePath]);
+        }
+        const newPastProjects = files.pastProjects.filter((_, i) => i !== index);
+        const newPastProjectUrls = uploadedFileUrls.pastProjects.filter((_, i) => i !== index);
+        setFiles({ ...files, pastProjects: newPastProjects });
+        setUploadedFileUrls({ ...uploadedFileUrls, pastProjects: newPastProjectUrls });
+      } else {
+        const fileUrl = uploadedFileUrls[fileType];
+        if (fileUrl) {
+          const filePath = fileUrl.split('/grant-documents/')[1];
+          await supabase.storage.from('grant-documents').remove([filePath]);
+        }
+        setFiles({ ...files, [fileType]: null });
+        setUploadedFileUrls({ ...uploadedFileUrls, [fileType]: null });
+      }
+    } catch (error: any) {
+      console.error('Error removing file:', error);
+    }
+  };
+
+  // Process and save data to Supabase database when Next is clicked
+  const handleProcessData = async () => {
+    if (!user) return;
+
+    setProcessingData(true);
+
+    try {
+      // 1. Create grant application record in database
+      const { data: grantApp, error: grantError } = await supabase
+        .from('grants')
+        .insert({
+          user_id: user.id,
+          nonprofit_name: grantInfo.nonprofitName,
+          grantor_name: grantInfo.grantorName,
+          funding_amount: parseFloat(grantInfo.fundingAmount.replace(/[^0-9.]/g, '')) || null,
+        })
+        .select()
+        .single();
+
+      if (grantError) throw grantError;
+
+      const grantId = grantApp.id;
+      setGrantApplicationId(grantId);
+
+      // 2. Save uploaded documents metadata to database
+      const documentsToInsert = [];
+
+      if (uploadedFileUrls.form990) {
+        documentsToInsert.push({
+          grant_id: grantId,
+          file_name: files.form990?.name || 'form990.pdf',
+          file_type: '990',
+          file_url: uploadedFileUrls.form990,
+        });
+      }
+
+      if (uploadedFileUrls.form1023) {
+        documentsToInsert.push({
+          grant_id: grantId,
+          file_name: files.form1023?.name || 'form1023.pdf',
+          file_type: '1023',
+          file_url: uploadedFileUrls.form1023,
+        });
+      }
+
+      uploadedFileUrls.pastProjects.forEach((url, index) => {
+        documentsToInsert.push({
+          grant_id: grantId,
+          file_name: files.pastProjects[index]?.name || `project_${index}.pdf`,
+          file_type: 'past_project',
+          file_url: url,
+        });
+      });
+
+      if (documentsToInsert.length > 0) {
+        const { error: docError } = await supabase
+          .from('uploaded_documents')
+          .insert(documentsToInsert);
+
+        if (docError) throw docError;
+      }
+
+      console.log('✅ Data saved to Supabase database successfully!');
+      console.log('Grant Application ID:', grantId);
+      console.log('Uploaded Documents:', documentsToInsert);
+      
+      // TODO (Shrish): Call backend API to process documents and create embeddings
+
+      alert('✅ Information saved! Ready to generate proposal.');
+      setActiveSection('generate');
+    } catch (error: any) {
+      console.error('Error processing data:', error);
+      alert(`Error: ${error.message}`);
+    } finally {
+      setProcessingData(false);
+    }
+  };
 
   const sections = [
     { id: 'information', label: 'Grant Information', icon: FileText },
     { id: 'generate', label: 'Generate Draft', icon: Plus }
   ];
 
-  // TODO: POST - Handle file uploads
-  // const handleFileUpload = async (fileType, file) => {
-  //   const formData = new FormData();
-  //   formData.append('file', file);
-  //   formData.append('fileType', fileType);
-  //   
-  //   try {
-  //     const response = await fetch('/api/upload', {
-  //       method: 'POST',
-  //       body: formData
-  //     });
-  //     const data = await response.json();
-  //     setFiles({...files, [fileType]: data.fileUrl});
-  //   } catch (error) {
-  //     console.error('Upload failed:', error);
-  //   }
-  // };
-
-  // TODO: POST - Generate grant proposal with all form data
   const handleGenerate = () => {
     setIsGenerating(true);
+    // TODO (Shrish): Replace with actual API call to generate grant proposal
     setTimeout(() => {
       setIsGenerating(false);
     }, 4000);
-    
-    // Replace setTimeout with actual API call:
-    // const handleGenerate = async () => {
-    //   setIsGenerating(true);
-    //   
-    //   try {
-    //     const response = await fetch('/api/generate-grant', {
-    //       method: 'POST',
-    //       headers: {
-    //         'Content-Type': 'application/json',
-    //       },
-    //       body: JSON.stringify({
-    //         nonprofitName: grantInfo.nonprofitName,
-    //         grantorName: grantInfo.grantorName,
-    //         fundingAmount: grantInfo.fundingAmount,
-    //         files: files
-    //       })
-    //     });
-    //     
-    //     const data = await response.json();
-    //     setGeneratedProposal(data.proposal);
-    //   } catch (error) {
-    //     console.error('Generation failed:', error);
-    //   } finally {
-    //     setIsGenerating(false);
-    //   }
-    // };
   };
-
-  // TODO: POST - Export proposal as DOCX or PDF
-  // const handleExport = async (format) => {
-  //   try {
-  //     const response = await fetch('/api/export', {
-  //       method: 'POST',
-  //       headers: {
-  //         'Content-Type': 'application/json',
-  //       },
-  //       body: JSON.stringify({
-  //         proposal: generatedProposal,
-  //         format: format // 'docx' or 'pdf'
-  //       })
-  //     });
-  //     
-  //     const blob = await response.blob();
-  //     const url = window.URL.createObjectURL(blob);
-  //     const a = document.createElement('a');
-  //     a.href = url;
-  //     a.download = `grant-proposal.${format}`;
-  //     a.click();
-  //   } catch (error) {
-  //     console.error('Export failed:', error);
-  //   }
-  // };
 
   return (
     <div className="flex h-screen bg-gray-50">
@@ -514,12 +581,10 @@ export default function GrantWritingTool() {
                   </div>
 
                   <div className="flex gap-3 mt-4">
-                    {/* TODO: Wire up handleExport('docx') onClick */}
                     <button className="flex-1 px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center justify-center gap-2">
                       <Download className="w-4 h-4" />
                       Export as DOCX
                     </button>
-                    {/* TODO: Wire up handleExport('pdf') onClick */}
                     <button className="flex-1 px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center justify-center gap-2">
                       <Download className="w-4 h-4" />
                       Export as PDF
@@ -534,11 +599,28 @@ export default function GrantWritingTool() {
         {/* Footer */}
         <footer className="bg-white border-t border-gray-200 px-8 py-4">
           <div className="flex justify-between items-center">
-            <button className="px-4 py-2 text-gray-600 hover:text-gray-900">
+            <button 
+              className="px-4 py-2 text-gray-600 hover:text-gray-900 disabled:opacity-50 disabled:cursor-not-allowed"
+              onClick={() => {
+                if (activeSection === 'generate') setActiveSection('information');
+              }}
+              disabled={activeSection === 'information'}
+            >
               ← Previous
             </button>
-            <button className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
-              Next →
+            <button 
+              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              onClick={handleProcessData}
+              disabled={processingData || activeSection === 'generate'}
+            >
+              {processingData ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  Processing...
+                </>
+              ) : (
+                'Next →'
+              )}
             </button>
           </div>
         </footer>
