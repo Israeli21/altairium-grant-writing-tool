@@ -156,6 +156,11 @@ export default function GrantWritingTool() {
       // 2. Save uploaded documents metadata to database
       const documentsToInsert = [];
 
+      console.log('📤 Preparing to insert documents...');
+      console.log('Form 990 URL:', uploadedFileUrls.form990);
+      console.log('Form 1023 URL:', uploadedFileUrls.form1023);
+      console.log('Past Projects URLs:', uploadedFileUrls.pastProjects);
+
       if (uploadedFileUrls.form990) {
         documentsToInsert.push({
           grant_id: grantId,
@@ -163,6 +168,7 @@ export default function GrantWritingTool() {
           file_type: '990',
           file_url: uploadedFileUrls.form990,
         });
+        console.log('✓ Added Form 990 to insert queue');
       }
 
       if (uploadedFileUrls.form1023) {
@@ -172,6 +178,7 @@ export default function GrantWritingTool() {
           file_type: '1023',
           file_url: uploadedFileUrls.form1023,
         });
+        console.log('✓ Added Form 1023 to insert queue');
       }
 
       uploadedFileUrls.pastProjects.forEach((url, index) => {
@@ -181,14 +188,22 @@ export default function GrantWritingTool() {
           file_type: 'past_project',
           file_url: url,
         });
+        console.log(`✓ Added past project ${index + 1} to insert queue`);
       });
 
+      console.log('📋 Documents to insert:', documentsToInsert);
+
       if (documentsToInsert.length > 0) {
+        console.log('💾 Inserting into uploaded_documents table...');
         const { error: docError } = await supabase
           .from('uploaded_documents')
           .insert(documentsToInsert);
 
-        if (docError) throw docError;
+        if (docError) {
+          console.error('❌ Database insert error:', docError);
+          throw docError;
+        }
+        console.log('✅ Documents inserted successfully!');
       }
 
       console.log('✅ Data saved to Supabase database successfully!');

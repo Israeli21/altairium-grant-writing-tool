@@ -19,9 +19,10 @@ async function fetchDocuments(limit = 5){
     .from('uploaded_documents')
     .select('id, file_name, file_url, file_type, extracted_text')
     .is('extracted_text', null)
+    .limit(limit)
 
-    if(error) error
-    return data
+    if(error) throw error
+    return data || []
 }
 // Step 2: Send PDFs to python microservice
 async function sendToService(urls){
@@ -31,8 +32,8 @@ async function sendToService(urls){
         body: JSON.stringify({urls})
     })
 
-    if (!response.ok) throw new Error("Scraper error: ${response.statusText}");
-    return await response.json();    
+    if (!response.ok) throw new Error(`Scraper error: ${response.statusText}`);
+    return await response.json();
 }
 
 // Step 3: Insert results back into supabase
@@ -48,13 +49,11 @@ async function storeResults(results){
         })
         .eq('file_url', url)
 
-        if (error) console.error('Failed to update ${url}:', error)
+        if (error) console.error(`Failed to update ${url}:`, error)
     }
 }
 
-
 // Main orchestration
-
 async function processBatch() {
     const documents = await fetchDocuments(5)
     if(!documents.length){
@@ -73,4 +72,3 @@ async function processBatch() {
 }
 
 processBatch().catch(console.error)
-

@@ -24,7 +24,7 @@ def scrape_pdf(request: PDFRequest):
     for url in request.urls:
     
         # Getting pdf from database
-        response = requests.get(request.url)
+        response = requests.get(url)
         pdfBytes = response.content
         
         formType = identifyFormType(pdfBytes)
@@ -44,6 +44,10 @@ def scrape_pdf(request: PDFRequest):
 
 # Helper functions to identify/parse forms
 def identifyFormType(pdfBytes: bytes) -> str:
+    """
+    Identify PDF form type based on content.
+    Returns: '990', '1023', or 'past_project' (for generic/other documents)
+    """
     document = fitz.open(stream=pdfBytes, filetype="pdf")
     firstPageText = document[0].get_text()
     if "Form 990" in firstPageText:
@@ -51,7 +55,7 @@ def identifyFormType(pdfBytes: bytes) -> str:
     elif "Form 1023" in firstPageText:
         return "1023"
     
-    return "generic"
+    return "past_project"  # Generic documents categorized as past_project
 
 # Parsing IRS Form 990
 def parse990(pdfBytes: bytes):
@@ -103,9 +107,28 @@ def parse1023(pdfBytes: bytes):
     }
     return data
 
-# Parsing other form
+# Parsing other form (generic PDF - extract all text)
 def parseGeneric(pdfBytes: bytes):
-    raise ValueError("needs to be completed")
+    """
+    Extract all text from a generic PDF document (past projects, fundraisers, etc).
+    Returns cleaned text without special formatting.
+    This is used for documents that aren't IRS Form 990 or 1023.
+    """
+    document = fitz.open(stream=pdfBytes, filetype="pdf")
+    
+    # Extract text from all pages
+    fullText = "\n".join(page.get_text("text") for page in document)
+    
+    # Clean up whitespace
+    fullText = re.sub(r'\s+', ' ', fullText).strip()
+    
+    data = {
+        "raw_text": fullText,
+        "page_count": len(document),
+        "document_type": "past_project"
+    }
+    
+    return data
 
 
 
