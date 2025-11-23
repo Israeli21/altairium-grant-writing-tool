@@ -156,7 +156,7 @@ export default function GrantWritingTool() {
       // 2. Save uploaded documents metadata to database
       const documentsToInsert = [];
 
-      console.log('📤 Preparing to insert documents...');
+      console.log('Preparing to insert documents...');
       console.log('Form 990 URL:', uploadedFileUrls.form990);
       console.log('Form 1023 URL:', uploadedFileUrls.form1023);
       console.log('Past Projects URLs:', uploadedFileUrls.pastProjects);
@@ -191,10 +191,7 @@ export default function GrantWritingTool() {
         console.log(`✓ Added past project ${index + 1} to insert queue`);
       });
 
-      console.log('📋 Documents to insert:', documentsToInsert);
-
       if (documentsToInsert.length > 0) {
-        console.log('💾 Inserting into uploaded_documents table...');
         const { error: docError } = await supabase
           .from('uploaded_documents')
           .insert(documentsToInsert);
@@ -203,10 +200,10 @@ export default function GrantWritingTool() {
           console.error('❌ Database insert error:', docError);
           throw docError;
         }
-        console.log('✅ Documents inserted successfully!');
+        console.log('Documents inserted successfully!');
       }
 
-      console.log('✅ Data saved to Supabase database successfully!');
+      console.log('Data saved to Supabase database successfully!');
       console.log('Grant Application ID:', grantId);
       console.log('Uploaded Documents:', documentsToInsert);
       

@@ -40,16 +40,21 @@ async function sendToService(urls){
 async function storeResults(results){
     for (const result of results){
         const {url, data, form_type} = result
+        
+        console.log(`📝 Updating ${url}...`)
+        
         const { error } = await supabase
         .from('uploaded_documents')
         .update({
-            extracted_text: JSON.stringify(data),
-            form_type,
-            processed_at: new Date()
+            extracted_text: JSON.stringify(data)
         })
         .eq('file_url', url)
 
-        if (error) console.error(`Failed to update ${url}:`, error)
+        if (error) {
+            console.error(`❌ Failed to update ${url}:`, error)
+        } else {
+            console.log(`✅ Successfully saved extracted text for ${url}`)
+        }
     }
 }
 
