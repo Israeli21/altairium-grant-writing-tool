@@ -44,13 +44,21 @@ export async function generateSection({
     warnings.push(...promptWarnings)
 
     const llmStart = nowHighRes()
-    const { result: llmResult, warnings: llmWarnings } = await callLLM({
-      deps,
-      prompt,
-      section,
+    if(!deps.llm){
+      warnings.push("LLM client not configured")
+      throw new Error("LLM client not configured")
+    }
+
+    const promptResult = buildPrompt({ context, section })
+    const llmAllResult = await deps.llm.generateAll({
+      grant: context.grant,
+      chunks: context.chunks,
+      sections: [section]
     })
+    const llmResult = llmAllResult.sections[section]
+    const llmwarnings = llmAllResult.warnings
+    warnings.push(...llmwarnings)
     const llmEnd = nowHighRes()
-    warnings.push(...llmWarnings)
 
     const content = llmResult.content ?? ''
     const generationCompletedAt = deps.now ? deps.now() : new Date()

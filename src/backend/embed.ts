@@ -9,13 +9,13 @@ import fetch from 'node-fetch'
 import { createClient } from '@supabase/supabase-js'
 import { Database } from '../../database.types'
 
-const SUPABASE_URL = process.env.SUPABASE_URL!
-const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY!
+const SUPABASE_URL = process.env.VITE_SUPABASE_URL!
+const SUPABASE_SERVICE_KEY = process.env.VITE_SUPABASE_ANON_KEY!
 
 
 
 if(!SUPABASE_URL || !SUPABASE_SERVICE_KEY){
-    throw new Error("Missing Supabase environment variables. Please check your .env file.")
+    throw new Error("Missing Supabase environment variables. Please check your .env file.-")
 }
 
 const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_SERVICE_KEY)
