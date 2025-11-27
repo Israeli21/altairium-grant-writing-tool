@@ -224,12 +224,47 @@ export default function GrantWritingTool() {
     { id: 'generate', label: 'Generate Draft', icon: Plus }
   ];
 
-  const handleGenerate = () => {
+  const handleGenerate = async () => {
     setIsGenerating(true);
-    // TODO (Shrish): Replace with actual API call to generate grant proposal
-    setTimeout(() => {
+    
+    try {
+      // Build the user request from grant info
+      const userRequest = `Write a grant proposal for ${grantInfo.nonprofitName} to ${grantInfo.grantorName} requesting ${grantInfo.fundingAmount}. ${grantInfo.additionalNotes}`;
+      
+      const response = await fetch('http://localhost:3000/generate-grant', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userRequest,
+          nonprofitId: grantInfo.nonprofitName,
+          matchCount: 5
+        })
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to generate grant');
+      }
+
+      const result = await response.json();
+      
+      // Display the final grant proposal
+      console.log('Grant generated successfully!');
+      console.log('Final Grant:', result.finalGrant);
+      console.log('Context chunks used:', result.contextChunks?.length || 0);
+      
+      // TODO: Update UI to display the generated grant
+      // You can store this in state and show it in a modal or new section
+      alert('Grant generated successfully! Check the console for the full proposal.');
+      
+    } catch (error) {
+      console.error('Error generating grant:', error);
+      alert(`Failed to generate grant: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
       setIsGenerating(false);
-    }, 4000);
+    }
   };
 
   return (
