@@ -1,7 +1,8 @@
 # 🚀 Grant Generation Pipeline - Setup Guide
 
 ## Prerequisites
-- Node.js 18+ 
+
+- Node.js 18+
 - Python 3.8+
 - Supabase account with:
   - `uploaded_documents` table
@@ -48,24 +49,28 @@ pip install fastapi uvicorn python-dotenv huggingface_hub numpy PyMuPDF requests
 ## Step 2: Start Services (4 terminals)
 
 ### Terminal 1 - Python Scraper (port 8000)
+
 ```powershell
 cd src/backend
-python -m uvicorn pyscrapepdf_utils:app --reload --port 8000
+python3 -m uvicorn pyscrapepdf_utils:app --reload --port 8000
 ```
 
 ### Terminal 2 - Python Embeddings (port 8001)
+
 ```powershell
 cd src/backend
-python -m uvicorn embed:app --reload --port 8001
+python3 -m uvicorn embed:app --reload --port 8001
 ```
 
 ### Terminal 3 - Express Backend (port 3000)
+
 ```powershell
 cd src/backend
 npx tsx server.ts
 ```
 
 ### Terminal 4 - Frontend (port 5173)
+
 ```powershell
 npm run dev
 ```
@@ -82,6 +87,7 @@ npx tsx createEmbeddings.ts
 ```
 
 Or call the API with specific document IDs:
+
 ```powershell
 $body = '{"documentIds": ["uuid-1", "uuid-2"]}'
 Invoke-WebRequest -Uri "http://localhost:3000/process-documents" -Method POST -ContentType "application/json" -Body $body
@@ -92,12 +98,14 @@ Invoke-WebRequest -Uri "http://localhost:3000/process-documents" -Method POST -C
 ## Step 4: Generate Grant
 
 ### Via API
+
 ```powershell
 $body = '{"userRequest": "Write a grant for our robotics program"}'
 Invoke-WebRequest -Uri "http://localhost:3000/generate-grant" -Method POST -ContentType "application/json" -Body $body -TimeoutSec 180
 ```
 
 ### Via Frontend
+
 1. Go to http://localhost:5173
 2. Fill in grant info (nonprofit name, grantor, funding amount)
 3. Upload documents (Form 990, Form 1023, past projects)
@@ -108,12 +116,12 @@ Invoke-WebRequest -Uri "http://localhost:3000/generate-grant" -Method POST -Cont
 
 ## Quick Reference - Service URLs
 
-| Service | Port | Endpoint |
-|---------|------|----------|
-| Scraper | 8000 | `POST /scrape` |
-| Embeddings | 8001 | `POST /embed` |
-| Backend | 3000 | `POST /generate-grant`, `POST /process-documents`, `GET /health` |
-| Frontend | 5173 | Web UI |
+| Service    | Port | Endpoint                                                         |
+| ---------- | ---- | ---------------------------------------------------------------- |
+| Scraper    | 8000 | `POST /scrape`                                                   |
+| Embeddings | 8001 | `POST /embed`                                                    |
+| Backend    | 3000 | `POST /generate-grant`, `POST /process-documents`, `GET /health` |
+| Frontend   | 5173 | Web UI                                                           |
 
 ---
 
@@ -145,21 +153,25 @@ Invoke-WebRequest -Uri "http://localhost:3000/generate-grant" -Method POST -Cont
 ## Troubleshooting
 
 ### "Embedding service error: 401 Unauthorized"
+
 - Add `HUGGINGFACE_TOKEN` to `.env`
 - Restart the embed.py service
 
 ### "No module named 'fitz'"
+
 - Run: `pip install PyMuPDF`
 
 ### "Embedding dimension mismatch"
+
 - Run this SQL in Supabase:
   ```sql
   ALTER TABLE document_embeddings ALTER COLUMN embedding TYPE vector(768);
   ```
 
 ### "Documents not found"
+
 - Make sure `SUPABASE_SERVICE_KEY` is set (bypasses RLS)
 
 ### Server not responding
-- Check all 4 services are running on correct ports
 
+- Check all 4 services are running on correct ports

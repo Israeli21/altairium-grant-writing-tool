@@ -232,11 +232,12 @@ export type Database = {
         Returns: string
       }
       match_documents: {
-        Args: { match_count?: number; query_embedding: number[] }
+        Args: { match_count?: number; query_embedding: number[]; filter_grant_id?: string | null }
         Returns: {
           content: string
           id: string
           similarity: number
+          uploaded_document_id: string | null
         }[]
       }
     }

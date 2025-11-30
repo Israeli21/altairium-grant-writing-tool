@@ -74,8 +74,7 @@ async function storeResults(results: ScraperResult[]): Promise<void> {
       .from('uploaded_documents')
       .update({
         extracted_text: JSON.stringify(data),
-        file_type: form_type,
-        processed_at: new Date().toISOString()
+        file_type: form_type
       })
       .eq('file_url', url);
 

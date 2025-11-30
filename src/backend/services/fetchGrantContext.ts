@@ -81,7 +81,8 @@ export async function fetchGrantContext(
   const { data: matches, error: embeddingsError } = await supabase.rpc('match_documents',
     {
       query_embedding: queryEmbedding,
-      match_count: maxChunks
+      match_count: maxChunks,
+      filter_grant_id: grantId || null
     }
   )
 

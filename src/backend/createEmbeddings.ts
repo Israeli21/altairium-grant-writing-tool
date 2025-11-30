@@ -195,8 +195,7 @@ async function processDocument(
         .from('uploaded_documents')
         .update({ 
           extracted_text: extractedText,
-          file_type: fileType,
-          processed_at: new Date().toISOString()
+          file_type: fileType
         })
         .eq('id', doc.id);
 
