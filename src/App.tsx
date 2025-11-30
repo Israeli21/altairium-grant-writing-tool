@@ -191,23 +191,50 @@ export default function GrantWritingTool() {
         console.log(`✓ Added past project ${index + 1} to insert queue`);
       });
 
+      let documentIds: string[] = [];
+      
       if (documentsToInsert.length > 0) {
-        const { error: docError } = await supabase
+        const { data: insertedDocs, error: docError } = await supabase
           .from('uploaded_documents')
-          .insert(documentsToInsert);
+          .insert(documentsToInsert)
+          .select('id');
 
         if (docError) {
           console.error('❌ Database insert error:', docError);
           throw docError;
         }
+        
+        documentIds = insertedDocs?.map(doc => doc.id) || [];
         console.log('Documents inserted successfully!');
+        console.log('Document IDs:', documentIds);
       }
 
       console.log('Data saved to Supabase database successfully!');
       console.log('Grant Application ID:', grantId);
       console.log('Uploaded Documents:', documentsToInsert);
       
-      // TODO (Shrish): Call backend API to process documents and create embeddings
+      // Process documents: scrape PDFs and create embeddings
+      if (documentIds.length > 0) {
+        console.log('📄 Processing documents for embeddings...');
+        
+        try {
+          const processResponse = await fetch('http://localhost:3000/process-documents', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ documentIds })
+          });
+
+          if (!processResponse.ok) {
+            const error = await processResponse.json();
+            console.warn('⚠️ Document processing warning:', error);
+          } else {
+            const processResult = await processResponse.json();
+            console.log('✅ Documents processed:', processResult);
+          }
+        } catch (processError) {
+          console.warn('⚠️ Could not process documents (backend may not be running):', processError);
+        }
+      }
 
       alert('✅ Information saved! Ready to generate proposal.');
       setActiveSection('generate');

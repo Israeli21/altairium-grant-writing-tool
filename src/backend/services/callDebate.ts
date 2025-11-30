@@ -1,5 +1,8 @@
-// Importing needed types
+// Load environment variables from root .env
+import dotenv from 'dotenv';
+dotenv.config({ path: '../../../.env' });
 
+// Importing needed types
 import type{
     LLMClient,
     GenerationSectionName,
@@ -10,7 +13,6 @@ import type{
 } from "./types.ts"
 
 // Importing needed functions
-
 import { buildPrompt, BuildPromptResult } from "./buildPrompt.ts";
 
 

@@ -1,192 +1,248 @@
 // backend/orchestrator/generateGrant.ts
+// Modular grant generation using services pipeline
 
 import 'dotenv/config';
-import fetch from 'node-fetch';
 import { createClient } from '@supabase/supabase-js';
+import type { Database } from '../../database.types';
+import { fetchGrantContext } from './services/fetchGrantContext';
+import { callDebate } from './services/callDebate';
+import type {
+  GenerationDependencies,
+  GenerationSectionName,
+  GenerationContextChunk,
+} from './services/types';
 
-const supabase = createClient(
-  process.env.SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_KEY!
-);
+// ---------- Supabase Client ----------
+
+const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL!;
+const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.VITE_SUPABASE_ANON_KEY!;
+
+const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 
 // ---------- Types ----------
 
 export interface GenerateGrantInput {
-  userRequest: string;           //"Write a grant for our robotics program...
-  nonprofitId?: string;          //  filter documents by org
-  matchCount?: number;           // how many RAG chunks to pull
+  userRequest: string;           // "Write a grant for our robotics program..."
+  grantId?: string;              // Optional: existing grant ID for context
+  nonprofitId?: string;          // Filter documents by org
+  matchCount?: number;           // How many RAG chunks to pull
+  sections?: GenerationSectionName[]; // Which sections to generate
 }
 
 export interface GenerateGrantResult {
   finalGrant: string;
-  proposerDraft: string;
-  challengerDraft: string;
-  refereeSummary: string;
-  contextChunks: { id: string; content: string; similarity: number }[];
+  sections: {
+    executive_summary?: string;
+    needs_statement?: string;
+    program_description?: string;
+    budget_overview?: string;
+  };
+  contextChunks: GenerationContextChunk[];
+  warnings: string[];
 }
 
-// ---------- Helper: get query embedding from your Python service ----------
+// ---------- Default Sections ----------
 
-async function getQueryEmbedding(text: string): Promise<number[]> {
-  const EMBED_URL = process.env.PYTHON_EMBED_URL ?? 'http://localhost:8000/embed';
+const DEFAULT_SECTIONS: GenerationSectionName[] = [
+  'executive_summary',
+  'needs_statement',
+  'program_description',
+  'budget_overview',
+];
 
-  const res = await fetch(EMBED_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ content: text })
-  });
+// ---------- Logger ----------
 
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`Embedding service failed (${res.status}): ${body}`);
-  }
-
-  const data = await res.json();
-  // adjust this if your service returns a different shape
-  return data.embedding as number[];
-}
-
-// ---------- Helper: RAG retrieval from Supabase ----------
-
-async function retrieveContext(
-  queryEmbedding: number[],
-  matchCount: number
-): Promise<{ id: string; content: string; similarity: number }[]> {
-  const { data, error } = await supabase.rpc('match_documents', {
-    query_embedding: queryEmbedding,
-    match_count: matchCount
-  });
-
-  if (error) {
-    console.error('Supabase match_documents error:', error);
-    throw error;
-  }
-
-  // you can add filtering by nonprofitId here later if your RPC supports it
-  return data ?? [];
-}
-
-// ---------- Helpers: call Gemini + Claude ----------
-
-async function callGemini(prompt: string): Promise<string> {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) throw new Error('GEMINI_API_KEY not set');
-
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
-  
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      contents: [{
-        parts: [{ text: prompt }]
-      }]
-    })
-  });
-
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`Gemini API failed (${res.status}): ${body}`);
-  }
-
-  const data: any = await res.json();
-  return data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
-}
-
-async function callClaude(prompt: string): Promise<string> {
-  const apiKey = process.env.CLAUDE_API_KEY;
-  if (!apiKey) throw new Error('CLAUDE_API_KEY not set');
-
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01'
-    },
-    body: JSON.stringify({
-      model: 'claude-3-5-sonnet-20241022',
-      max_tokens: 4096,
-      messages: [{ role: 'user', content: prompt }]
-    })
-  });
-
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`Claude API failed (${res.status}): ${body}`);
-  }
-
-  const data: any = await res.json();
-  return data.content?.[0]?.text ?? '';
-}
+const logger = {
+  debug: (msg: string, meta?: Record<string, unknown>) => console.log(`[DEBUG] ${msg}`, meta || ''),
+  info: (msg: string, meta?: Record<string, unknown>) => console.log(`[INFO] ${msg}`, meta || ''),
+  warn: (msg: string, meta?: Record<string, unknown>) => console.warn(`[WARN] ${msg}`, meta || ''),
+  error: (msg: string, meta?: Record<string, unknown>) => console.error(`[ERROR] ${msg}`, meta || ''),
+};
 
 // ---------- Main Orchestrator ----------
 
 export async function generateGrant(input: GenerateGrantInput): Promise<GenerateGrantResult> {
-  const { userRequest, matchCount = 5 } = input;
+  const { 
+    userRequest, 
+    grantId,
+    matchCount = 10,
+    sections = DEFAULT_SECTIONS 
+  } = input;
 
-  console.log('Step 1: Getting query embedding...');
-  const queryEmbedding = await getQueryEmbedding(userRequest);
+  const warnings: string[] = [];
 
-  console.log('Step 2: Retrieving context from database...');
-  const contextChunks = await retrieveContext(queryEmbedding, matchCount);
+  console.log('═'.repeat(60));
+  console.log('  GRANT GENERATION PIPELINE');
+  console.log('═'.repeat(60));
 
-  const contextText = contextChunks
-    .map((chunk, idx) => `[Document ${idx + 1}]:\n${chunk.content}`)
-    .join('\n\n');
+  // Step 1: Create or use existing grant record
+  console.log('\n📋 Step 1: Setting up grant context...');
+  
+  let activeGrantId = grantId;
+  
+  if (!activeGrantId) {
+    // Create a temporary grant record for this generation
+    const { data: newGrant, error: grantError } = await supabase
+      .from('grants')
+      .insert({
+        nonprofit_name: input.nonprofitId || 'Grant Application',
+        proposal_type: 'generated',
+      })
+      .select('id')
+      .single();
 
-  console.log('Step 3: Proposer (Gemini) drafting grant...');
-  const proposerPrompt = `You are a grant writing expert. Using the following context from the nonprofit's documents, write a compelling grant proposal addressing this request:
-
-Request: ${userRequest}
-
-Context:
-${contextText}
-
-Write a comprehensive grant proposal with clear sections covering the problem, solution, impact, and budget considerations.`;
-
-  const proposerDraft = await callGemini(proposerPrompt);
-
-  console.log('Step 4: Challenger (Claude) critiquing...');
-  const challengerPrompt = `You are a critical grant reviewer. Review this grant proposal and identify weaknesses, missing information, or areas that need improvement:
-
-Original Request: ${userRequest}
-
-Proposal:
-${proposerDraft}
-
-Provide constructive criticism and suggest specific improvements.`;
-
-  let challengerDraft = '';
-  try {
-    challengerDraft = await callClaude(challengerPrompt);
-  } catch (error) {
-    console.warn('Claude API not available, using Gemini for challenger:', error);
-    challengerDraft = await callGemini(challengerPrompt);
+    if (grantError) {
+      warnings.push(`Could not create grant record: ${grantError.message}`);
+      logger.warn('Failed to create grant record', { error: grantError });
+    } else {
+      activeGrantId = newGrant.id;
+      console.log(`   ✅ Created grant record: ${activeGrantId}`);
+    }
   }
 
-  console.log('Step 5: Referee (Gemini) synthesizing final grant...');
-  const refereePrompt = `You are the final arbiter synthesizing the best grant proposal. 
+  // Step 2: Initialize LLM client (using OpenAI via callDebate)
+  console.log('\n🤖 Step 2: Initializing LLM client...');
+  const llm = new callDebate(process.env);
+  console.log('   ✅ Using OpenAI (gpt-4.1-mini)');
 
-Original Request: ${userRequest}
+  // Step 3: Set up dependencies
+  const deps: GenerationDependencies = {
+    supabase,
+    llm,
+    now: () => new Date(),
+    logger,
+  };
 
-Initial Proposal:
-${proposerDraft}
+  // Step 4: Fetch context using RAG
+  console.log('\n📚 Step 3: Fetching context via RAG...');
+  
+  let context;
+  try {
+    context = await fetchGrantContext(deps, {
+      grantId: activeGrantId || '',
+      query: userRequest,
+      maxChunks: matchCount,
+    });
+    
+    console.log(`   ✅ Found ${context.chunks.length} context chunks`);
+    
+    if (context.warnings.length > 0) {
+      warnings.push(...context.warnings);
+      context.warnings.forEach(w => console.log(`   ⚠️  ${w}`));
+    }
+  } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    warnings.push(`Context retrieval failed: ${errorMsg}`);
+    logger.error('Failed to fetch context', { error });
+    
+    // Continue with empty context
+    context = {
+      grant: null,
+      chunks: [],
+      warnings: [`Context retrieval failed: ${errorMsg}`],
+    };
+  }
 
-Critique:
-${challengerDraft}
+  // Step 5: Generate all sections
+  console.log('\n✍️  Step 4: Generating grant sections...');
+  console.log(`   Sections: ${sections.join(', ')}`);
 
-Create the final, polished grant proposal incorporating the valid criticisms and improvements. Make it compelling, well-structured, and professional.`;
+  const startTime = Date.now();
+  
+  const result = await llm.generateAll({
+    grant: context.grant,
+    chunks: context.chunks,
+    sections,
+  });
 
-  const finalGrant = await callGemini(refereePrompt);
+  const generationTime = Date.now() - startTime;
+  console.log(`   ✅ Generation completed in ${generationTime}ms`);
 
-  const refereeSummary = `Synthesized proposal incorporating feedback. Key improvements made based on critical review.`;
+  if (result.warnings.length > 0) {
+    warnings.push(...result.warnings);
+  }
+
+  // Step 6: Assemble final grant document
+  console.log('\n📝 Step 5: Assembling final grant document...');
+
+  const sectionContents: GenerateGrantResult['sections'] = {};
+  const sectionOrder: GenerationSectionName[] = [
+    'executive_summary',
+    'needs_statement', 
+    'program_description',
+    'budget_overview',
+  ];
+
+  // Extract section contents
+  for (const section of sectionOrder) {
+    if (section === 'custom') continue; // Skip custom sections in standard assembly
+    const sectionResult = result.sections[section];
+    if (sectionResult?.content) {
+      sectionContents[section as keyof typeof sectionContents] = sectionResult.content;
+    }
+  }
+
+  // Combine sections into final grant
+  const finalGrant = assembleFinalGrant(sectionContents);
+
+  console.log('\n' + '═'.repeat(60));
+  console.log('  GENERATION COMPLETE');
+  console.log('═'.repeat(60));
+  console.log(`  Sections generated: ${Object.keys(sectionContents).length}`);
+  console.log(`  Context chunks used: ${context.chunks.length}`);
+  console.log(`  Total time: ${generationTime}ms`);
+  console.log(`  Warnings: ${warnings.length}`);
+  console.log('═'.repeat(60) + '\n');
 
   return {
     finalGrant,
-    proposerDraft,
-    challengerDraft,
-    refereeSummary,
-    contextChunks
+    sections: sectionContents,
+    contextChunks: context.chunks,
+    warnings,
   };
+}
+
+// ---------- Helper: Assemble Final Grant Document ----------
+
+function assembleFinalGrant(
+  sections: GenerateGrantResult['sections']
+): string {
+  const parts: string[] = [];
+
+  parts.push('═'.repeat(60));
+  parts.push('GRANT PROPOSAL');
+  parts.push('═'.repeat(60));
+  parts.push('');
+
+  if (sections.executive_summary) {
+    parts.push('EXECUTIVE SUMMARY');
+    parts.push('─'.repeat(40));
+    parts.push(sections.executive_summary);
+    parts.push('');
+  }
+
+  if (sections.needs_statement) {
+    parts.push('STATEMENT OF NEED');
+    parts.push('─'.repeat(40));
+    parts.push(sections.needs_statement);
+    parts.push('');
+  }
+
+  if (sections.program_description) {
+    parts.push('PROGRAM DESCRIPTION');
+    parts.push('─'.repeat(40));
+    parts.push(sections.program_description);
+    parts.push('');
+  }
+
+  if (sections.budget_overview) {
+    parts.push('BUDGET OVERVIEW');
+    parts.push('─'.repeat(40));
+    parts.push(sections.budget_overview);
+    parts.push('');
+  }
+
+  parts.push('═'.repeat(60));
+
+  return parts.join('\n');
 }

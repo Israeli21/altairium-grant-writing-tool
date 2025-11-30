@@ -5,6 +5,8 @@
 //
 
 import 'dotenv/config'
+import dotenv from 'dotenv'
+dotenv.config({ path: '../../.env' })
 import fetch from 'node-fetch'
 import { createClient } from '@supabase/supabase-js'
 import { Database } from '../../database.types'
@@ -21,7 +23,8 @@ if(!SUPABASE_URL || !SUPABASE_SERVICE_KEY){
 const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
 
-const PYTHON_EMBED_URL = "http://localhost:8000/embed"
+// embed.py runs on port 8001, pyscrapepdf_utils.py runs on port 8000
+const PYTHON_EMBED_URL = process.env.PYTHON_EMBED_URL || "http://localhost:8001/embed"
 
 
 interface EmbeddingResponse{

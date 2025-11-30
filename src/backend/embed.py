@@ -3,12 +3,16 @@ from pydantic import BaseModel
 import requests
 from huggingface_hub import InferenceClient
 import os
+from dotenv import load_dotenv
 
-
+# Load .env file from project root
+load_dotenv(dotenv_path='../../.env')
 
 # Model information
 model_id = "google/embeddinggemma-300m"
 hf_token = os.getenv("HUGGINGFACE_TOKEN")
+
+print(f"🔑 HuggingFace Token: {'✅ Found' if hf_token else '❌ Missing'}")
 
 # Testing the model
 client = InferenceClient(model=model_id, token=hf_token)
