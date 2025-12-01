@@ -53,7 +53,7 @@ function promptUser(question: string): Promise<string> {
 
 // Step 1: Upload PDF to Supabase Storage
 async function uploadPdfToStorage(filePath: string): Promise<string> {
-  console.log('\n📤 Step 1: Uploading PDF to Supabase Storage...')
+  console.log('\nStep 1: Uploading PDF to Supabase Storage...')
   
   if (!fs.existsSync(filePath)) {
     throw new Error(`File not found: ${filePath}`)
@@ -82,13 +82,13 @@ async function uploadPdfToStorage(filePath: string): Promise<string> {
     .from(storageBucket)
     .getPublicUrl(storagePath)
 
-  console.log(`✅ PDF uploaded: ${publicUrl}`)
+  console.log(`PDF uploaded: ${publicUrl}`)
   return publicUrl
 }
 
 // Step 2: Scrape PDF (extract text using Python service)
 async function scrapePdf(pdfUrl: string): Promise<string> {
-  console.log('\n📝 Step 2: Extracting text from PDF...')
+  console.log('\nStep 2: Extracting text from PDF...')
   
   try {
     const response = await fetch(PYTHON_SCRAPER_URL, {
@@ -110,14 +110,14 @@ async function scrapePdf(pdfUrl: string): Promise<string> {
     const result = results[0]
     const extractedText = result.data ? JSON.stringify(result.data) : result.text || ''
     
-    console.log(`✅ Text extracted: ${extractedText.length} characters`)
+    console.log(`Text extracted: ${extractedText.length} characters`)
     if (result.form_type) {
-      console.log(`   Form type detected: ${result.form_type}`)
+      console.log(`Form type detected: ${result.form_type}`)
     }
     
     return extractedText
   } catch (error) {
-    console.error('⚠️  Scraper service error:', error)
+    console.error('Scraper service error:', error)
     throw new Error(`Failed to scrape PDF: ${error instanceof Error ? error.message : String(error)}`)
   }
 }
@@ -129,7 +129,7 @@ async function createEmbeddingsForText(
   grantId?: string,
   userId?: string
 ): Promise<void> {
-  console.log('\n🔢 Step 3: Creating embeddings...')
+  console.log('\nStep 3: Creating embeddings...')
   
   try {
     // Chunk the text if it's too long (embedding models have token limits)
@@ -155,7 +155,7 @@ async function createEmbeddingsForText(
       chunks.push(text)
     }
 
-    console.log(`   Creating embeddings for ${chunks.length} chunk(s)...`)
+    console.log(`Creating embeddings for ${chunks.length} chunk(s)...`)
 
     // Create embeddings for each chunk
     for (let i = 0; i < chunks.length; i++) {
@@ -193,12 +193,12 @@ async function createEmbeddingsForText(
         throw new Error(`Failed to store embedding: ${embedError.message}`)
       }
 
-      console.log(`   ✅ Embedding ${i + 1}/${chunks.length} created`)
+      console.log(`Embedding ${i + 1}/${chunks.length} created`)
     }
 
-    console.log(`✅ All embeddings created and stored`)
+    console.log(`All embeddings created and stored`)
   } catch (error) {
-    console.error('❌ Failed to create embeddings:', error)
+    console.error('Failed to create embeddings:', error)
     throw error
   }
 }
@@ -209,7 +209,7 @@ async function createOrGetGrant(
   grantorName?: string,
   fundingAmount?: number
 ): Promise<string> {
-  console.log('\n📋 Step 4: Setting up grant record...')
+  console.log('\nStep 4: Setting up grant record...')
 
   // For testing, create a simple grant record
   const { data: grant, error: grantError } = await supabase
@@ -225,13 +225,13 @@ async function createOrGetGrant(
 
   if (grantError) {
     // If grant already exists or other error, try to get existing
-    console.warn('⚠️  Could not create grant, using existing or default')
+    console.warn('Could not create grant, using existing or default')
     // For simplicity, we'll just generate a UUID or use a default
     // In production, you'd want better error handling
     throw new Error(`Failed to create grant: ${grantError.message}`)
   }
 
-  console.log(`✅ Grant record created: ${grant.id}`)
+  console.log(`Grant record created: ${grant.id}`)
   return grant.id
 }
 
@@ -241,9 +241,9 @@ async function generateGrantSections(
   sections: GenerationSectionName[],
   query: string
 ): Promise<void> {
-  console.log('\n🤖 Step 5: Generating grant sections using RAG pipeline...')
-  console.log(`   Sections: ${sections.join(', ')}`)
-  console.log(`   Query: ${query}\n`)
+  console.log('\nStep 5: Generating grant sections using RAG pipeline...')
+  console.log(`Sections: ${sections.join(', ')}`)
+  console.log(`Query: ${query}\n`)
 
   const llm = new callDebate(process.env)
 
@@ -260,7 +260,7 @@ async function generateGrantSections(
   }
 
   // Fetch context (RAG retrieval)
-  console.log('📚 Fetching context from embeddings...')
+  console.log('Fetching context from embeddings...')
   const context = await fetchGrantContext(deps, {
     grantId,
     query,
@@ -268,14 +268,14 @@ async function generateGrantSections(
   })
 
   if (context.warnings.length > 0) {
-    console.warn('⚠️  Warnings:')
-    context.warnings.forEach(warning => console.warn(`  - ${warning}`))
+    console.warn('Warnings:')
+    context.warnings.forEach(warning => console.warn(`- ${warning}`))
   }
 
-  console.log(`✅ Found ${context.chunks.length} context chunks`)
+  console.log(`Found ${context.chunks.length} context chunks`)
 
   // Generate sections
-  console.log('🎨 Generating sections...')
+  console.log('Generating sections...')
   const startTime = Date.now()
   
   const result = await llm.generateAll({
@@ -285,7 +285,7 @@ async function generateGrantSections(
   })
 
   const generationTime = Date.now() - startTime
-  console.log(`✅ Generation completed in ${generationTime}ms\n`)
+  console.log(`Generation completed in ${generationTime}ms\n`)
 
   // Print results
   console.log('\n' + '═'.repeat(80))
@@ -309,7 +309,7 @@ async function generateGrantSections(
       console.log(sectionContent)
       console.log('='.repeat(80) + '\n')
     } else {
-      console.warn(`\n⚠️  Section "${section}" was not generated\n`)
+      console.warn(`\nSection "${section}" was not generated\n`)
     }
   }
 
@@ -325,13 +325,13 @@ async function generateGrantSections(
 
 // Main function
 export async function testGen(): Promise<void> {
-  console.log('\n🚀 Grant Generation Test Pipeline')
+  console.log('\nGrant Generation Test Pipeline')
   console.log('═'.repeat(80))
 
   try {
     // Use sample_pdf.pdf from project root
     const filePath = path.join(process.cwd(), 'sample_pdf.pdf')
-    console.log(`\n📄 Using PDF: ${filePath}`)
+    console.log(`\nUsing PDF: ${filePath}`)
     
     if (!fs.existsSync(filePath)) {
       throw new Error(`PDF file not found: ${filePath}`)
@@ -344,7 +344,7 @@ export async function testGen(): Promise<void> {
     const extractedText = await scrapePdf(pdfUrl)
 
     // Step 3: Create document record
-    console.log('\n💾 Step 3: Creating document record...')
+    console.log('\nStep 3: Creating document record...')
     const { data: document, error: docError } = await supabase
       .from('uploaded_documents')
       .insert({
@@ -361,7 +361,7 @@ export async function testGen(): Promise<void> {
     }
 
     const documentId = document.id
-    console.log(`✅ Document record created: ${documentId}`)
+    console.log(`Document record created: ${documentId}`)
 
     // Step 4: Create embeddings
     const grantId = await createOrGetGrant()
@@ -374,17 +374,17 @@ export async function testGen(): Promise<void> {
       .eq('id', documentId)
 
     // Step 5: Get query from user
-    const query = await promptUser('\n🔍 Enter query for grant generation (e.g., "robotics program grant"): ') || 'grant proposal'
+    const query = await promptUser('\nEnter query for grant generation (e.g., "robotics program grant"): ') || 'grant proposal'
 
     // Step 6: Generate grant sections
     await generateGrantSections(grantId, DEFAULT_SECTIONS, query)
 
-    console.log('✅ Test generation completed successfully!')
+    console.log('Test generation completed successfully!')
     console.log(`\nGrant ID: ${grantId}`)
     console.log(`Document ID: ${documentId}\n`)
 
   } catch (error) {
-    console.error('\n❌ Error during test generation:')
+    console.error('\nError during test generation:')
     console.error(error instanceof Error ? error.message : String(error))
     if (error instanceof Error && error.stack) {
       console.error('\nStack trace:')
@@ -403,7 +403,7 @@ if (isMainModule) {
       process.exit(0)
     })
     .catch(error => {
-      console.error('❌ Test generation failed:', error)
+      console.error('Test generation failed:', error)
       process.exit(1)
     })
 }

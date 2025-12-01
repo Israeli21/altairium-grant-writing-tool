@@ -90,7 +90,7 @@ export default function GrantWritingTool() {
         setUploadedFileUrls({ ...uploadedFileUrls, [fileType]: publicUrl });
       }
 
-      console.log(`✅ ${file.name} uploaded successfully to Supabase!`);
+      console.log(`${file.name} uploaded successfully to Supabase!`);
     } catch (error: any) {
       console.error('Upload failed:', error);
       alert(`Upload failed: ${error.message}`);
@@ -200,7 +200,7 @@ export default function GrantWritingTool() {
           .select('id');
 
         if (docError) {
-          console.error('❌ Database insert error:', docError);
+          console.error('Database insert error:', docError);
           throw docError;
         }
         
@@ -215,7 +215,7 @@ export default function GrantWritingTool() {
       
       // Process documents: scrape PDFs and create embeddings
       if (documentIds.length > 0) {
-        console.log('📄 Processing documents for embeddings...');
+        console.log('Processing documents for embeddings...');
         
         try {
           const processResponse = await fetch('http://localhost:3000/process-documents', {
@@ -226,17 +226,17 @@ export default function GrantWritingTool() {
 
           if (!processResponse.ok) {
             const error = await processResponse.json();
-            console.warn('⚠️ Document processing warning:', error);
+            console.warn('Document processing warning:', error);
           } else {
             const processResult = await processResponse.json();
-            console.log('✅ Documents processed:', processResult);
+            console.log('Documents processed:', processResult);
           }
         } catch (processError) {
-          console.warn('⚠️ Could not process documents (backend may not be running):', processError);
+          console.warn('Could not process documents (backend may not be running):', processError);
         }
       }
 
-      alert('✅ Information saved! Ready to generate proposal.');
+      alert('Information saved! Ready to generate proposal.');
       setActiveSection('generate');
     } catch (error: any) {
       console.error('Error processing data:', error);

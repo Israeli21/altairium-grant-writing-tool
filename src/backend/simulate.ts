@@ -43,10 +43,10 @@ export async function simulateGrant({
   sections = DEFAULT_SECTIONS,
   query = 'grant proposal',
 }: SimulateParams): Promise<void> {
-  console.log('\n🚀 Starting Grant Generation Simulation')
-  console.log(`📋 Grant ID: ${grantId}`)
-  console.log(`📝 Sections to generate: ${sections.join(', ')}`)
-  console.log(`🔍 Query: ${query}\n`)
+  console.log('\nStarting Grant Generation Simulation')
+  console.log(`Grant ID: ${grantId}`)
+  console.log(`Sections to generate: ${sections.join(', ')}`)
+  console.log(`Query: ${query}\n`)
 
   // Setup dependencies
   const supabase = createClient<Database>(
@@ -70,7 +70,7 @@ export async function simulateGrant({
 
   try {
     // Step 1: Fetch context
-    console.log('📚 Fetching grant context...')
+    console.log('Fetching grant context...')
     const context = await fetchGrantContext(deps, {
       grantId,
       query,
@@ -78,18 +78,18 @@ export async function simulateGrant({
     })
 
     if (context.warnings.length > 0) {
-      console.warn('⚠️  Warnings during context fetch:')
-      context.warnings.forEach(warning => console.warn(`  - ${warning}`))
+      console.warn('Warnings during context fetch:')
+      context.warnings.forEach(warning => console.warn(`- ${warning}`))
     }
 
-    console.log(`✅ Found ${context.chunks.length} context chunks`)
+    console.log(`Found ${context.chunks.length} context chunks`)
     if (context.grant) {
-      console.log(`   Grantor: ${context.grant.grantor_name || 'N/A'}`)
-      console.log(`   Funding: $${context.grant.funding_amount || 'N/A'}`)
+      console.log(`Grantor: ${context.grant.grantor_name || 'N/A'}`)
+      console.log(`Funding: $${context.grant.funding_amount || 'N/A'}`)
     }
 
     // Step 2: Generate all sections
-    console.log('\n🤖 Generating sections with LLM...')
+    console.log('\nGenerating sections with LLM...')
     const startTime = Date.now()
     
     const result = await llm.generateAll({
@@ -99,11 +99,11 @@ export async function simulateGrant({
     })
 
     const generationTime = Date.now() - startTime
-    console.log(`✅ Generation completed in ${generationTime}ms`)
+    console.log(`Generation completed in ${generationTime}ms`)
 
     if (result.warnings.length > 0) {
-      console.warn('\n⚠️  Generation warnings:')
-      result.warnings.forEach(warning => console.warn(`  - ${warning}`))
+      console.warn('\nGeneration warnings:')
+      result.warnings.forEach(warning => console.warn(`- ${warning}`))
     }
 
     // Step 3: Print all sections
@@ -116,7 +116,7 @@ export async function simulateGrant({
       if (sectionContent) {
         printSection(section, sectionContent)
       } else {
-        console.warn(`\n⚠️  Section "${section}" was not generated\n`)
+        console.warn(`\nSection "${section}" was not generated\n`)
       }
     }
 
@@ -134,7 +134,7 @@ export async function simulateGrant({
     console.log('═'.repeat(80) + '\n')
 
   } catch (error) {
-    console.error('\n❌ Error during simulation:')
+    console.error('\nError during simulation:')
     console.error(error instanceof Error ? error.message : String(error))
     if (error instanceof Error && error.stack) {
       console.error('\nStack trace:')
@@ -166,11 +166,11 @@ if (require.main === module) {
     query: queryArg,
   })
     .then(() => {
-      console.log('✅ Simulation completed successfully')
+      console.log('Simulation completed successfully')
       process.exit(0)
     })
     .catch(error => {
-      console.error('❌ Simulation failed:', error)
+      console.error('Simulation failed:', error)
       process.exit(1)
     })
 }

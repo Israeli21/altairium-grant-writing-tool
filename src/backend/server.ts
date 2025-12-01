@@ -29,7 +29,7 @@ app.post('/process-documents', async (req, res) => {
       return res.status(400).json({ error: 'documentIds array is required' });
     }
 
-    console.log(`\n📄 Processing ${documentIds.length} documents...`);
+    console.log(`\nProcessing ${documentIds.length} documents...`);
     const results = await processDocumentsByIds(documentIds);
 
     const successCount = results.filter(r => r.status === 'success').length;

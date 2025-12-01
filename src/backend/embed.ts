@@ -110,11 +110,11 @@ async function createEmbeddings(uploaded_document_id: string,
   }
 }
 
-// For simple queries
 
 export async function embedQuery(query: string) : Promise<number[]>{
     try{
         const result = await sendToService(query);
+        console.log("Result: ", result);
         if(!result || !Array.isArray(result.embedding)){
             throw new Error("Embedding service did not return a vector");
         }

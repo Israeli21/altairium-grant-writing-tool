@@ -72,7 +72,7 @@ interface ScraperResult {
 
 // Scrape PDF to extract text using Python service (from scrape.ts)
 async function scrapePdf(fileUrl: string): Promise<{ text: string; formType: string }> {
-  console.log(`  📄 Scraping PDF from: ${fileUrl.substring(0, 60)}...`);
+  console.log(`Scraping PDF from: ${fileUrl.substring(0, 60)}...`);
   
   const response = await fetch(PYTHON_SCRAPER_URL, {
     method: 'POST',
@@ -94,7 +94,7 @@ async function scrapePdf(fileUrl: string): Promise<{ text: string; formType: str
   const result = results[0];
   const extractedText = result.data ? JSON.stringify(result.data) : '';
   
-  console.log(`  ✅ Scraped ${extractedText.length} characters (form_type: ${result.form_type})`);
+  console.log(`Scraped ${extractedText.length} characters (form_type: ${result.form_type})`);
   return { text: extractedText, formType: result.form_type };
 }
 
@@ -200,9 +200,9 @@ async function processDocument(
         .eq('id', doc.id);
 
       if (updateError) {
-        console.warn(`  ⚠️ Could not save extracted_text: ${updateError.message}`);
+        console.warn(`Could not save extracted_text: ${updateError.message}`);
       } else {
-        console.log(`  ✅ Saved extracted_text to database`);
+        console.log(`Saved extracted_text to database`);
       }
     }
 
@@ -225,11 +225,11 @@ async function processDocument(
     console.log(`  Storing embedding...`);
     await storeEmbedding(doc.id, doc.grant_id, textContent, embedding, supabase);
 
-    console.log(`  ✅ Success!`);
+    console.log(`Success!`);
     return { docId: doc.id, fileName: doc.file_name, status: 'success' };
 
   } catch (error: any) {
-    console.error(`  ❌ Error: ${error.message}`);
+    console.error(`Error: ${error.message}`);
     return { docId: doc.id, fileName: doc.file_name, status: 'error', message: error.message };
   }
 }
@@ -242,7 +242,7 @@ export async function processDocumentsByIds(
   const supabase = supabaseClient || defaultSupabase;
   const results: ProcessResult[] = [];
 
-  console.log(`\n📄 Processing ${documentIds.length} document(s)...`);
+  console.log(`\nProcessing ${documentIds.length} document(s)...`);
   
   const documents = await fetchDocumentsByIds(documentIds, supabase);
   
@@ -261,7 +261,7 @@ export async function processDocumentsByIds(
     results.push(result);
   }
 
-  console.log(`\n✅ Processing complete: ${results.filter(r => r.status === 'success').length}/${results.length} successful\n`);
+  console.log(`\nProcessing complete: ${results.filter(r => r.status === 'success').length}/${results.length} successful\n`);
   return results;
 }
 
@@ -272,7 +272,7 @@ export async function processAllPendingDocuments(
   const supabase = supabaseClient || defaultSupabase;
   const results: ProcessResult[] = [];
 
-  console.log('\n📄 Fetching documents needing embeddings...');
+  console.log('\nFetching documents needing embeddings...');
   const documents = await fetchDocumentsNeedingEmbeddings(supabase);
 
   if (documents.length === 0) {
@@ -287,7 +287,7 @@ export async function processAllPendingDocuments(
     results.push(result);
   }
 
-  console.log(`\n✅ All embeddings created: ${results.filter(r => r.status === 'success').length}/${results.length} successful\n`);
+  console.log(`\nAll embeddings created: ${results.filter(r => r.status === 'success').length}/${results.length} successful\n`);
   return results;
 }
 

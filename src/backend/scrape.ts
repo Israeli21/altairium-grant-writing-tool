@@ -101,9 +101,9 @@ async function processBatch(): Promise<void> {
     console.log("Scraper results:", results);
 
     await storeResults(results);
-    console.log("✅ All documents processed and stored.");
+    console.log("All documents processed and stored.");
   } catch (error) {
-    console.error("❌ Error processing batch:", error);
+    console.error("Error processing batch:", error);
     throw error;
   }
 }

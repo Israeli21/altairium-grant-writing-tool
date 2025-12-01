@@ -76,7 +76,7 @@ export async function generateGrant(input: GenerateGrantInput): Promise<Generate
   console.log('═'.repeat(60));
 
   // Step 1: Create or use existing grant record
-  console.log('\n📋 Step 1: Setting up grant context...');
+  console.log('\nStep 1: Setting up grant context...');
   
   let activeGrantId = grantId;
   
@@ -96,14 +96,14 @@ export async function generateGrant(input: GenerateGrantInput): Promise<Generate
       logger.warn('Failed to create grant record', { error: grantError });
     } else {
       activeGrantId = newGrant.id;
-      console.log(`   ✅ Created grant record: ${activeGrantId}`);
+      console.log(`Created grant record: ${activeGrantId}`);
     }
   }
 
   // Step 2: Initialize LLM client (using OpenAI via callDebate)
-  console.log('\n🤖 Step 2: Initializing LLM client...');
+  console.log('\nInitializing LLM client...');
   const llm = new callDebate(process.env);
-  console.log('   ✅ Using OpenAI (gpt-4.1-mini)');
+  console.log('Using OpenAI (gpt-4.1-mini)');
 
   // Step 3: Set up dependencies
   const deps: GenerationDependencies = {
@@ -114,7 +114,7 @@ export async function generateGrant(input: GenerateGrantInput): Promise<Generate
   };
 
   // Step 4: Fetch context using RAG
-  console.log('\n📚 Step 3: Fetching context via RAG...');
+  console.log('\nFetching context via RAG...');
   
   let context;
   try {
@@ -124,11 +124,11 @@ export async function generateGrant(input: GenerateGrantInput): Promise<Generate
       maxChunks: matchCount,
     });
     
-    console.log(`   ✅ Found ${context.chunks.length} context chunks`);
+    console.log(`Found ${context.chunks.length} context chunks`);
     
     if (context.warnings.length > 0) {
       warnings.push(...context.warnings);
-      context.warnings.forEach(w => console.log(`   ⚠️  ${w}`));
+      context.warnings.forEach(w => console.log(`   (WARNING)  ${w}`));
     }
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : String(error);
@@ -144,7 +144,7 @@ export async function generateGrant(input: GenerateGrantInput): Promise<Generate
   }
 
   // Step 5: Generate all sections
-  console.log('\n✍️  Step 4: Generating grant sections...');
+  console.log('\nGenerating grant sections...');
   console.log(`   Sections: ${sections.join(', ')}`);
 
   const startTime = Date.now();
@@ -156,14 +156,14 @@ export async function generateGrant(input: GenerateGrantInput): Promise<Generate
   });
 
   const generationTime = Date.now() - startTime;
-  console.log(`   ✅ Generation completed in ${generationTime}ms`);
+  console.log(`Generation completed in ${generationTime}ms`);
 
   if (result.warnings.length > 0) {
     warnings.push(...result.warnings);
   }
 
   // Step 6: Assemble final grant document
-  console.log('\n📝 Step 5: Assembling final grant document...');
+  console.log('\nAssembling final grant document...');
 
   const sectionContents: GenerateGrantResult['sections'] = {};
   const sectionOrder: GenerationSectionName[] = [

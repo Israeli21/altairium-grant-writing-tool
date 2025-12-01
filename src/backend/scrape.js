@@ -41,7 +41,7 @@ async function storeResults(results){
     for (const result of results){
         const {url, data, form_type} = result
         
-        console.log(`📝 Updating ${url}...`)
+        console.log(`Updating ${url}...`)
         
         const { error } = await supabase
         .from('uploaded_documents')
@@ -51,9 +51,9 @@ async function storeResults(results){
         .eq('file_url', url)
 
         if (error) {
-            console.error(`❌ Failed to update ${url}:`, error)
+            console.error(`Failed to update ${url}:`, error)
         } else {
-            console.log(`✅ Successfully saved extracted text for ${url}`)
+            console.log(`Successfully saved extracted text for ${url}`)
         }
     }
 }
