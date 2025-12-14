@@ -13,7 +13,7 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_KEY || ''
 );
 
-const PYTHON_EMBED_URL = process.env.PYTHON_EMBED_URL || 'http://localhost:8000/embed';
+const PYTHON_EMBED_URL = process.env.PYTHON_EMBED_URL || 'http://localhost:8001/embed';
 
 interface Document {
   id: string;
@@ -55,7 +55,11 @@ async function generateEmbedding(text: string): Promise<number[]> {
     throw new Error(`Embedding service error: ${response.statusText}`);
   }
 
-  const result = await response.json() as { embedding: number[], text: string };
+  const result = await response.json() as { embedding: number[], text: string, error?: string };
+  console.log('Response from embedding service:', result ? 'received' : 'null', Object.keys(result || {}));
+  if (result.error) {
+    throw new Error(`Embedding service returned error: ${result.error}`);
+  }
   return result.embedding;
 }
 
@@ -66,15 +70,22 @@ async function storeEmbedding(
   content: string,
   embedding: number[]
 ): Promise<void> {
-  const { error } = await supabase
+  console.log('Inserting embedding with dimensions:', embedding.length);
+  const { data, error } = await supabase
     .from('document_embeddings')
     .insert({
+      uploaded_document_id: documentId,
       grant_id: grantId,
       content: content,
       embedding: embedding
-    });
+    })
+    .select();
 
-  if (error) throw error;
+  if (error) {
+    console.error('Insert error:', error);
+    throw error;
+  }
+  console.log('Inserted successfully:', data);
 }
 
 // Main function
@@ -122,6 +133,7 @@ async function processDocumentEmbeddings() {
         // Generate embedding
         console.log('Generating embedding...');
         const embedding = await generateEmbedding(textContent.substring(0, 5000)); // Limit to first 5000 chars
+        console.log('Embedding received, type:', typeof embedding, 'is array:', Array.isArray(embedding));
 
         // Store in database
         console.log('Storing embedding...');

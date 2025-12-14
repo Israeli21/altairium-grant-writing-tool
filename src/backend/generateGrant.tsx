@@ -29,6 +29,7 @@ export interface GenerateGrantResult {
 
 async function getQueryEmbedding(text: string): Promise<number[]> {
   const EMBED_URL = process.env.PYTHON_EMBED_URL ?? 'http://localhost:8000/embed';
+  console.log(`Calling embedding service at ${EMBED_URL}...`);
 
   const res = await fetch(EMBED_URL, {
     method: 'POST',
@@ -42,6 +43,7 @@ async function getQueryEmbedding(text: string): Promise<number[]> {
   }
 
   const data = await res.json();
+  console.log('Embedding service response:', { hasEmbedding: !!data.embedding, embeddingType: typeof data.embedding, embeddingLength: data.embedding?.length });
   // adjust this if your service returns a different shape
   return data.embedding as number[];
 }
@@ -52,27 +54,122 @@ async function retrieveContext(
   queryEmbedding: number[],
   matchCount: number
 ): Promise<{ id: string; content: string; similarity: number }[]> {
-  const { data, error } = await supabase.rpc('match_documents', {
-    query_embedding: queryEmbedding,
-    match_count: matchCount
-  });
-
+  console.log('Retrieving context. Query embedding length:', queryEmbedding?.length);
+  
+  // Bypass schema cache by using raw SQL query instead of RPC
+  const { data, error } = await supabase
+    .from('document_embeddings')
+    .select('id, content, embedding')
+    .limit(1000); // Get a reasonable sample
+  
   if (error) {
-    console.error('Supabase match_documents error:', error);
+    console.error('Supabase query error:', error);
     throw error;
   }
 
-  // you can add filtering by nonprofitId here later if your RPC supports it
-  return data ?? [];
+  if (!data || data.length === 0) {
+    console.log('No documents found in database');
+    return [];
+  }
+
+  console.log(`Found ${data.length} documents in database`);
+
+  // Calculate cosine similarity manually
+  const results = data.map((doc: any, index: number) => {
+    let embedding = doc.embedding;
+    
+    // Parse embedding if it's stored as string or object
+    if (typeof embedding === 'string') {
+      try {
+        embedding = JSON.parse(embedding);
+      } catch (e) {
+        console.warn(`Document ${index} (id: ${doc.id}) has unparseable embedding string`);
+        return { id: doc.id, content: doc.content, similarity: 0 };
+      }
+    }
+    
+    // Validate embedding
+    if (!embedding || !Array.isArray(embedding)) {
+      console.warn(`Document ${index} (id: ${doc.id}) has invalid embedding:`, typeof embedding);
+      return {
+        id: doc.id,
+        content: doc.content,
+        similarity: 0
+      };
+    }
+    
+    if (embedding.length !== queryEmbedding.length) {
+      console.warn(`Document ${index} embedding length mismatch: ${embedding.length} vs ${queryEmbedding.length}`);
+      return {
+        id: doc.id,
+        content: doc.content,
+        similarity: 0
+      };
+    }
+    
+    // Cosine similarity: dot product / (magnitude1 * magnitude2)
+    let dotProduct = 0;
+    let mag1 = 0;
+    let mag2 = 0;
+    
+    for (let i = 0; i < queryEmbedding.length; i++) {
+      dotProduct += queryEmbedding[i] * embedding[i];
+      mag1 += queryEmbedding[i] * queryEmbedding[i];
+      mag2 += embedding[i] * embedding[i];
+    }
+    
+    mag1 = Math.sqrt(mag1);
+    mag2 = Math.sqrt(mag2);
+    
+    const similarity = mag1 > 0 && mag2 > 0 ? dotProduct / (mag1 * mag2) : 0;
+    
+    return {
+      id: doc.id,
+      content: doc.content,
+      similarity: similarity
+    };
+  });
+
+  // Sort by similarity (descending) and return top matches
+  results.sort((a, b) => b.similarity - a.similarity);
+  const topResults = results.slice(0, matchCount);
+  console.log(`Returning top ${topResults.length} matches`);
+  return topResults;
 }
 
-// ---------- Helpers: call Gemini + Claude ----------
+// ---------- Helpers: call OpenAI, Gemini + Claude ----------
+
+async function callOpenAI(prompt: string): Promise<string> {
+  const apiKey = process.env.OPENAIKEY;
+  if (!apiKey) throw new Error('OPENAIKEY not set');
+
+  const res = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`
+    },
+    body: JSON.stringify({
+      model: 'gpt-4o-mini',
+      messages: [{ role: 'user', content: prompt }],
+      max_tokens: 4096
+    })
+  });
+
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`OpenAI API failed (${res.status}): ${body}`);
+  }
+
+  const data: any = await res.json();
+  return data.choices?.[0]?.message?.content ?? '';
+}
 
 async function callGemini(prompt: string): Promise<string> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error('GEMINI_API_KEY not set');
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${apiKey}`;
   
   const res = await fetch(url, {
     method: 'POST',
@@ -127,6 +224,13 @@ export async function generateGrant(input: GenerateGrantInput): Promise<Generate
 
   console.log('Step 1: Getting query embedding...');
   const queryEmbedding = await getQueryEmbedding(userRequest);
+  
+  if (!queryEmbedding || !Array.isArray(queryEmbedding) || queryEmbedding.length === 0) {
+    console.error('Failed to get query embedding. Received:', queryEmbedding);
+    throw new Error('Failed to generate query embedding - embedding service may be down');
+  }
+  
+  console.log(`Successfully got query embedding with ${queryEmbedding.length} dimensions`);
 
   console.log('Step 2: Retrieving context from database...');
   const contextChunks = await retrieveContext(queryEmbedding, matchCount);
@@ -135,7 +239,7 @@ export async function generateGrant(input: GenerateGrantInput): Promise<Generate
     .map((chunk, idx) => `[Document ${idx + 1}]:\n${chunk.content}`)
     .join('\n\n');
 
-  console.log('Step 3: Proposer (Gemini) drafting grant...');
+  console.log('Step 3: Proposer (OpenAI) drafting grant...');
   const proposerPrompt = `You are a grant writing expert. Using the following context from the nonprofit's documents, write a compelling grant proposal addressing this request:
 
 Request: ${userRequest}
@@ -145,9 +249,9 @@ ${contextText}
 
 Write a comprehensive grant proposal with clear sections covering the problem, solution, impact, and budget considerations.`;
 
-  const proposerDraft = await callGemini(proposerPrompt);
+  const proposerDraft = await callOpenAI(proposerPrompt);
 
-  console.log('Step 4: Challenger (Claude) critiquing...');
+  console.log('Step 4: Challenger (OpenAI) critiquing...');
   const challengerPrompt = `You are a critical grant reviewer. Review this grant proposal and identify weaknesses, missing information, or areas that need improvement:
 
 Original Request: ${userRequest}
@@ -157,15 +261,9 @@ ${proposerDraft}
 
 Provide constructive criticism and suggest specific improvements.`;
 
-  let challengerDraft = '';
-  try {
-    challengerDraft = await callClaude(challengerPrompt);
-  } catch (error) {
-    console.warn('Claude API not available, using Gemini for challenger:', error);
-    challengerDraft = await callGemini(challengerPrompt);
-  }
+  const challengerDraft = await callOpenAI(challengerPrompt);
 
-  console.log('Step 5: Referee (Gemini) synthesizing final grant...');
+  console.log('Step 5: Referee (OpenAI) synthesizing final grant...');
   const refereePrompt = `You are the final arbiter synthesizing the best grant proposal. 
 
 Original Request: ${userRequest}
@@ -178,7 +276,7 @@ ${challengerDraft}
 
 Create the final, polished grant proposal incorporating the valid criticisms and improvements. Make it compelling, well-structured, and professional.`;
 
-  const finalGrant = await callGemini(refereePrompt);
+  const finalGrant = await callOpenAI(refereePrompt);
 
   const refereeSummary = `Synthesized proposal incorporating feedback. Key improvements made based on critical review.`;
 
