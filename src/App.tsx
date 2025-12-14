@@ -48,6 +48,7 @@ export default function GrantWritingTool() {
   }>>([]);
   const [loadingGrants, setLoadingGrants] = useState(false);
   const [savingGrant, setSavingGrant] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
 
   // Load saved grants on component mount
   useEffect(() => {
@@ -145,15 +146,11 @@ export default function GrantWritingTool() {
   // Function to render markdown to HTML with Helvetica font
   const renderMarkdownToHtml = (markdown: string): string => {
     let html = markdown
-      // Escape HTML
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      // Headers with inline styles
+      // Headers with inline styles (BEFORE escaping)
       .replace(/^### (.*$)/gim, '<h3 style="font-family: Helvetica, Arial, sans-serif; font-size: 18px; font-weight: bold; margin: 16px 0 6px 0;">$1</h3>')
       .replace(/^## (.*$)/gim, '<h2 style="font-family: Helvetica, Arial, sans-serif; font-size: 22px; font-weight: bold; margin: 18px 0 8px 0;">$1</h2>')
       .replace(/^# (.*$)/gim, '<h1 style="font-family: Helvetica, Arial, sans-serif; font-size: 28px; font-weight: bold; margin: 20px 0 10px 0;">$1</h1>')
-      // Bold with inline style
+      // Bold with inline style (BEFORE escaping)
       .replace(/\*\*(.+?)\*\*/g, '<strong style="font-weight: bold;">$1</strong>')
       // Line breaks
       .replace(/\n/g, '<br>');
@@ -791,17 +788,39 @@ export default function GrantWritingTool() {
 
                 {generatedGrant && (
                   <div className="border-t border-gray-200 pt-6">
-                    <h4 className="font-semibold text-gray-900 mb-4">Generated Proposal</h4>
+                    <div className="flex items-center justify-between mb-4">
+                      <h4 className="font-semibold text-gray-900">Generated Proposal</h4>
+                      <button
+                        onClick={() => setIsEditMode(!isEditMode)}
+                        className="px-3 py-1 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                      >
+                        {isEditMode ? 'Preview' : 'Edit Markdown'}
+                      </button>
+                    </div>
                     <p className="text-sm text-gray-600 mb-3">Review and edit your grant proposal below:</p>
                     <p className="text-sm text-gray-500 mb-4">
                       Feel free to further customize specific organizational details or statistics relevant to your mission and targeted communities. Thank you for considering our proposal.
                     </p>
-                    <textarea
-                      value={generatedGrant}
-                      onChange={(e) => setGeneratedGrant(e.target.value)}
-                      className="w-full h-96 p-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono text-sm resize-y"
-                      placeholder="Your generated grant proposal will appear here..."
-                    />
+                    
+                    {isEditMode ? (
+                      <textarea
+                        value={generatedGrant}
+                        onChange={(e) => setGeneratedGrant(e.target.value)}
+                        className="w-full h-96 p-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono text-sm resize-y"
+                        placeholder="Your generated grant proposal will appear here..."
+                      />
+                    ) : (
+                      <div 
+                        className="w-full min-h-96 p-8 border border-gray-300 rounded-lg bg-white"
+                        style={{ fontFamily: 'Helvetica, Arial, sans-serif' }}
+                      >
+                        <div 
+                          className="markdown-content"
+                          style={{ fontFamily: 'Helvetica, Arial, sans-serif' }}
+                          dangerouslySetInnerHTML={{ __html: renderMarkdownToHtml(generatedGrant) }}
+                        />
+                      </div>
+                    )}
 
                     <div className="flex gap-3 mt-4">
                       <button 
