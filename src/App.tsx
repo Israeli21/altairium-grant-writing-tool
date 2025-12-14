@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { FileText, Upload, Download, Plus, ChevronRight, LogOut, X } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { FileText, Upload, Download, Plus, ChevronRight, LogOut, X, Save, Clock } from 'lucide-react';
 import { useAuth } from './contexts/AuthContext';
 import LoginPage from './components/LoginPage';
 import logo from './assets/altairium-logo.png';
@@ -36,6 +36,130 @@ export default function GrantWritingTool() {
   });
   const [grantApplicationId, setGrantApplicationId] = useState<string | null>(null);
   const [processingData, setProcessingData] = useState(false);
+  const [generatedGrant, setGeneratedGrant] = useState('');
+  const [showPdfPreview, setShowPdfPreview] = useState(false);
+  const [savedGrants, setSavedGrants] = useState<Array<{
+    id: string;
+    name: string;
+    content: string;
+    nonprofit_name: string;
+    grantor_name: string;
+    created_at: string;
+  }>>([]);
+  const [loadingGrants, setLoadingGrants] = useState(false);
+  const [savingGrant, setSavingGrant] = useState(false);
+
+  // Load saved grants on component mount
+  useEffect(() => {
+    if (user) {
+      loadSavedGrants();
+    }
+  }, [user]);
+
+  // Load saved grants from database
+  const loadSavedGrants = async () => {
+    setLoadingGrants(true);
+    try {
+      const { data, error } = await supabase
+        .from('saved_grants')
+        .select('*')
+        .eq('user_id', user?.id)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setSavedGrants(data || []);
+    } catch (error) {
+      console.error('Error loading saved grants:', error);
+    } finally {
+      setLoadingGrants(false);
+    }
+  };
+
+  // Save current grant to database
+  const saveCurrentGrant = async () => {
+    if (!generatedGrant || !user) {
+      alert('No grant to save!');
+      return;
+    }
+
+    setSavingGrant(true);
+    try {
+      const grantName = `${grantInfo.nonprofitName || 'Untitled'} - ${grantInfo.grantorName || 'Grant'}`;
+      
+      const { data, error } = await supabase
+        .from('saved_grants')
+        .insert([{
+          user_id: user.id,
+          name: grantName,
+          content: generatedGrant,
+          nonprofit_name: grantInfo.nonprofitName,
+          grantor_name: grantInfo.grantorName,
+          funding_amount: grantInfo.fundingAmount,
+          additional_notes: grantInfo.additionalNotes
+        }])
+        .select();
+
+      if (error) throw error;
+      
+      alert('Grant saved successfully!');
+      await loadSavedGrants();
+    } catch (error) {
+      console.error('Error saving grant:', error);
+      alert(`Failed to save grant: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setSavingGrant(false);
+    }
+  };
+
+  // Load a saved grant
+  const loadSavedGrant = (grant: typeof savedGrants[0]) => {
+    setGeneratedGrant(grant.content);
+    setGrantInfo({
+      nonprofitName: grant.nonprofit_name || '',
+      grantorName: grant.grantor_name || '',
+      fundingAmount: grant.funding_amount || '',
+      additionalNotes: grant.additional_notes || ''
+    });
+    setActiveSection('generate');
+  };
+
+  // Delete a saved grant
+  const deleteSavedGrant = async (grantId: string) => {
+    if (!confirm('Are you sure you want to delete this grant?')) return;
+
+    try {
+      const { error } = await supabase
+        .from('saved_grants')
+        .delete()
+        .eq('id', grantId);
+
+      if (error) throw error;
+      
+      await loadSavedGrants();
+    } catch (error) {
+      console.error('Error deleting grant:', error);
+      alert(`Failed to delete grant: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  };
+
+  // Function to render markdown to HTML with Helvetica font
+  const renderMarkdownToHtml = (markdown: string): string => {
+    let html = markdown
+      // Escape HTML
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      // Headers with inline styles
+      .replace(/^### (.*$)/gim, '<h3 style="font-family: Helvetica, Arial, sans-serif; font-size: 18px; font-weight: bold; margin: 16px 0 6px 0;">$1</h3>')
+      .replace(/^## (.*$)/gim, '<h2 style="font-family: Helvetica, Arial, sans-serif; font-size: 22px; font-weight: bold; margin: 18px 0 8px 0;">$1</h2>')
+      .replace(/^# (.*$)/gim, '<h1 style="font-family: Helvetica, Arial, sans-serif; font-size: 28px; font-weight: bold; margin: 20px 0 10px 0;">$1</h1>')
+      // Bold with inline style
+      .replace(/\*\*(.+?)\*\*/g, '<strong style="font-weight: bold;">$1</strong>')
+      // Line breaks
+      .replace(/\n/g, '<br>');
+    
+    return html;
+  };
 
   // Show loading while checking authentication
   if (loading) {
@@ -255,9 +379,8 @@ export default function GrantWritingTool() {
       console.log('Final Grant:', result.finalGrant);
       console.log('Context chunks used:', result.contextChunks?.length || 0);
       
-      // TODO: Update UI to display the generated grant
-      // You can store this in state and show it in a modal or new section
-      alert('Grant generated successfully! Check the console for the full proposal.');
+      // Store the generated grant
+      setGeneratedGrant(result.finalGrant);
       
     } catch (error) {
       console.error('Error generating grant:', error);
@@ -269,7 +392,7 @@ export default function GrantWritingTool() {
 
   return (
     <div className="flex h-screen bg-gray-50">
-      {/* Sidebar */}
+      {/* Left Sidebar */}
       <div className="w-56 bg-black flex flex-col py-4 rounded-r-2xl">
         <div className="px-4 mb-6">
           <div className="flex items-center gap-3">
@@ -607,37 +730,123 @@ export default function GrantWritingTool() {
                   </div>
                 )}
 
-                <div className="border-t border-gray-200 pt-6">
-                  <h4 className="font-semibold text-gray-900 mb-4">Preview: Draft Output</h4>
-                  <div className="bg-gray-50 rounded-lg p-6 space-y-4 border border-gray-200">
-                    <div>
-                      <h5 className="font-semibold text-gray-800 mb-2">Executive Summary</h5>
-                      <p className="text-sm text-gray-600 leading-relaxed">
-                        [Generated content will appear here based on your inputs. The AI will create a cohesive narrative that aligns with grant writing best practices...]
-                      </p>
-                    </div>
-                    <div>
-                      <h5 className="font-semibold text-gray-800 mb-2">Needs Statement</h5>
-                      <p className="text-sm text-gray-600 leading-relaxed">
-                        [This section will articulate the problem your project addresses, supported by relevant data and aligned with your organization's mission...]
-                      </p>
-                    </div>
-                    <div className="text-center py-4">
-                      <p className="text-xs text-gray-500">+ Additional sections</p>
+                {showPdfPreview && (
+                  <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-lg w-full max-w-4xl h-[90vh] flex flex-col">
+                      <div className="flex items-center justify-between p-4 border-b border-gray-200">
+                        <h3 className="text-xl font-bold text-gray-900">PDF Preview</h3>
+                        <button 
+                          onClick={() => setShowPdfPreview(false)}
+                          className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                        >
+                          <X className="w-5 h-5" />
+                        </button>
+                      </div>
+                      <div className="flex-1 overflow-auto p-8 bg-gray-50">
+                        <div className="bg-white shadow-lg max-w-3xl mx-auto p-12" style={{ minHeight: '11in', width: '8.5in', fontFamily: 'Helvetica, Arial, sans-serif' }}>
+                          <div 
+                            className="markdown-content text-base leading-relaxed text-gray-800"
+                            style={{ fontFamily: 'Helvetica, Arial, sans-serif' }}
+                            dangerouslySetInnerHTML={{ __html: renderMarkdownToHtml(generatedGrant) }}
+                          />
+                        </div>
+                      </div>
+                      <div className="p-4 border-t border-gray-200 flex justify-end gap-3">
+                        <button 
+                          onClick={() => setShowPdfPreview(false)}
+                          className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+                        >
+                          Close
+                        </button>
+                        <button 
+                          onClick={() => {
+                            const printWindow = window.open('', '', 'height=600,width=800');
+                            if (printWindow) {
+                              printWindow.document.write('<html><head><title>Grant Proposal</title>');
+                              printWindow.document.write('<style>');
+                              printWindow.document.write('body { font-family: Helvetica, Arial, sans-serif; padding: 40px; line-height: 1.6; font-size: 16px; }');
+                              printWindow.document.write('h1 { font-size: 28px; font-weight: bold; margin: 20px 0 10px 0; }');
+                              printWindow.document.write('h2 { font-size: 22px; font-weight: bold; margin: 18px 0 8px 0; }');
+                              printWindow.document.write('h3 { font-size: 18px; font-weight: bold; margin: 16px 0 6px 0; }');
+                              printWindow.document.write('strong { font-weight: bold; }');
+                              printWindow.document.write('@media print { body { margin: 0; padding: 40px; } }');
+                              printWindow.document.write('</style>');
+                              printWindow.document.write('</head><body>');
+                              printWindow.document.write('<div>' + renderMarkdownToHtml(generatedGrant) + '</div>');
+                              printWindow.document.write('</body></html>');
+                              printWindow.document.close();
+                              printWindow.print();
+                            }
+                            setShowPdfPreview(false);
+                          }}
+                          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
+                        >
+                          <Download className="w-4 h-4" />
+                          Download PDF
+                        </button>
+                      </div>
                     </div>
                   </div>
+                )}
 
-                  <div className="flex gap-3 mt-4">
-                    <button className="flex-1 px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center justify-center gap-2">
-                      <Download className="w-4 h-4" />
-                      Export as DOCX
-                    </button>
-                    <button className="flex-1 px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center justify-center gap-2">
-                      <Download className="w-4 h-4" />
-                      Export as PDF
-                    </button>
+                {generatedGrant && (
+                  <div className="border-t border-gray-200 pt-6">
+                    <h4 className="font-semibold text-gray-900 mb-4">Generated Proposal</h4>
+                    <p className="text-sm text-gray-600 mb-3">Review and edit your grant proposal below:</p>
+                    <p className="text-sm text-gray-500 mb-4">
+                      Feel free to further customize specific organizational details or statistics relevant to your mission and targeted communities. Thank you for considering our proposal.
+                    </p>
+                    <textarea
+                      value={generatedGrant}
+                      onChange={(e) => setGeneratedGrant(e.target.value)}
+                      className="w-full h-96 p-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono text-sm resize-y"
+                      placeholder="Your generated grant proposal will appear here..."
+                    />
+
+                    <div className="flex gap-3 mt-4">
+                      <button 
+                        onClick={() => setShowPdfPreview(true)}
+                        className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center justify-center gap-2"
+                      >
+                        <FileText className="w-4 h-4" />
+                        Preview as PDF
+                      </button>
+                      <button 
+                        onClick={() => {
+                          const blob = new Blob([generatedGrant], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+                          const url = URL.createObjectURL(blob);
+                          const a = document.createElement('a');
+                          a.href = url;
+                          a.download = `${grantInfo.nonprofitName}_Grant_Proposal.docx`;
+                          a.click();
+                          URL.revokeObjectURL(url);
+                        }}
+                        className="flex-1 px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center justify-center gap-2"
+                      >
+                        <Download className="w-4 h-4" />
+                        Export as DOCX
+                      </button>
+                      <button 
+                        onClick={() => {
+                          const printWindow = window.open('', '', 'height=600,width=800');
+                          if (printWindow) {
+                            printWindow.document.write('<html><head><title>Grant Proposal</title>');
+                            printWindow.document.write('<style>body{font-family: Arial, sans-serif; padding: 40px; line-height: 1.6;}</style>');
+                            printWindow.document.write('</head><body>');
+                            printWindow.document.write('<pre style="white-space: pre-wrap; word-wrap: break-word;">' + generatedGrant + '</pre>');
+                            printWindow.document.write('</body></html>');
+                            printWindow.document.close();
+                            printWindow.print();
+                          }
+                        }}
+                        className="flex-1 px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center justify-center gap-2"
+                      >
+                        <Download className="w-4 h-4" />
+                        Export as PDF
+                      </button>
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
             </div>
           )}
@@ -671,6 +880,78 @@ export default function GrantWritingTool() {
             </button>
           </div>
         </footer>
+      </div>
+
+      {/* Right Sidebar - Saved Grants */}
+      <div className="w-80 bg-white border-l border-gray-200 flex flex-col">
+        <div className="p-6 border-b border-gray-200">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold text-gray-900">Saved Grants</h2>
+            {generatedGrant && (
+              <button
+                onClick={saveCurrentGrant}
+                disabled={savingGrant}
+                className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors disabled:opacity-50"
+                title="Save current grant"
+              >
+                {savingGrant ? (
+                  <div className="w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                ) : (
+                  <Save className="w-5 h-5" />
+                )}
+              </button>
+            )}
+          </div>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-4">
+          {loadingGrants ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+            </div>
+          ) : savedGrants.length === 0 ? (
+            <div className="text-center py-8 text-gray-500">
+              <FileText className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+              <p className="text-sm">No saved grants yet</p>
+              <p className="text-xs mt-1">Generate and save your first grant!</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {savedGrants.map((grant) => (
+                <div
+                  key={grant.id}
+                  className="bg-gray-50 rounded-lg p-4 hover:bg-gray-100 transition-colors cursor-pointer border border-gray-200"
+                  onClick={() => loadSavedGrant(grant)}
+                >
+                  <div className="flex items-start justify-between mb-2">
+                    <h3 className="font-medium text-gray-900 text-sm line-clamp-2 flex-1">
+                      {grant.name}
+                    </h3>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        deleteSavedGrant(grant.id);
+                      }}
+                      className="ml-2 p-1 text-gray-400 hover:text-red-600 transition-colors"
+                      title="Delete grant"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                  <div className="flex items-center gap-2 text-xs text-gray-500">
+                    <Clock className="w-3 h-3" />
+                    <span>{new Date(grant.created_at).toLocaleDateString()}</span>
+                  </div>
+                  {grant.nonprofit_name && (
+                    <p className="text-xs text-gray-600 mt-2 truncate">
+                      {grant.nonprofit_name}
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
