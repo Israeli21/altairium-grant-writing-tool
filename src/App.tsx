@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { FileText, Upload, Download, Plus, ChevronRight, LogOut, X, Save, Clock } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { FileText, Upload, Download, Plus, ChevronRight, LogOut, X, Save, Clock, Bold, Italic, Heading1, Heading2, Heading3 } from 'lucide-react';
 import { useAuth } from './contexts/AuthContext';
 import LoginPage from './components/LoginPage';
 import logo from './assets/altairium-logo.png';
@@ -49,6 +49,7 @@ export default function GrantWritingTool() {
   const [loadingGrants, setLoadingGrants] = useState(false);
   const [savingGrant, setSavingGrant] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Load saved grants on component mount
   useEffect(() => {
@@ -143,17 +144,83 @@ export default function GrantWritingTool() {
     }
   };
 
+  // Text formatting helpers
+  const insertFormatting = (prefix: string, suffix: string = '') => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const selectedText = generatedGrant.substring(start, end);
+    const beforeText = generatedGrant.substring(0, start);
+    const afterText = generatedGrant.substring(end);
+
+    const newText = beforeText + prefix + selectedText + suffix + afterText;
+    setGeneratedGrant(newText);
+
+    // Set cursor position after formatting
+    setTimeout(() => {
+      textarea.focus();
+      const newPosition = start + prefix.length + selectedText.length;
+      textarea.setSelectionRange(newPosition, newPosition);
+    }, 0);
+  };
+
   // Function to render markdown to HTML with Helvetica font
   const renderMarkdownToHtml = (markdown: string): string => {
-    let html = markdown
-      // Headers with inline styles (BEFORE escaping)
-      .replace(/^### (.*$)/gim, '<h3 style="font-family: Helvetica, Arial, sans-serif; font-size: 18px; font-weight: bold; margin: 16px 0 6px 0;">$1</h3>')
-      .replace(/^## (.*$)/gim, '<h2 style="font-family: Helvetica, Arial, sans-serif; font-size: 22px; font-weight: bold; margin: 18px 0 8px 0;">$1</h2>')
-      .replace(/^# (.*$)/gim, '<h1 style="font-family: Helvetica, Arial, sans-serif; font-size: 28px; font-weight: bold; margin: 20px 0 10px 0;">$1</h1>')
-      // Bold with inline style (BEFORE escaping)
-      .replace(/\*\*(.+?)\*\*/g, '<strong style="font-weight: bold;">$1</strong>')
-      // Line breaks
-      .replace(/\n/g, '<br>');
+    let html = markdown;
+    
+    // Remove horizontal rules (---)
+    html = html.replace(/^---+$/gim, '');
+    
+    // Convert markdown tables to HTML tables
+    const tableRegex = /\|(.+)\|\n\|[-:\s|]+\|\n((?:\|.+\|\n?)+)/g;
+    html = html.replace(tableRegex, (match, headerRow, bodyRows) => {
+      // Parse header
+      const headers = headerRow.split('|').map((h: string) => h.trim()).filter((h: string) => h);
+      
+      // Parse body rows
+      const rows = bodyRows.trim().split('\n').map((row: string) => 
+        row.split('|').map((cell: string) => cell.trim()).filter((cell: string) => cell)
+      );
+      
+      // Build HTML table
+      let table = '<table style="width: 100%; border-collapse: collapse; margin: 20px 0; font-family: Helvetica, Arial, sans-serif;">';
+      
+      // Header
+      table += '<thead><tr>';
+      headers.forEach((header: string) => {
+        table += `<th style="border: 1px solid #ddd; padding: 12px; background-color: #f3f4f6; text-align: left; font-weight: bold;">${header}</th>`;
+      });
+      table += '</tr></thead>';
+      
+      // Body
+      table += '<tbody>';
+      rows.forEach((row: string[]) => {
+        table += '<tr>';
+        row.forEach((cell: string) => {
+          table += `<td style="border: 1px solid #ddd; padding: 12px;">${cell}</td>`;
+        });
+        table += '</tr>';
+      });
+      table += '</tbody></table>';
+      
+      return table;
+    });
+    
+    // Headers with inline styles
+    html = html.replace(/^### (.*$)/gim, '<h3 style="font-family: Helvetica, Arial, sans-serif; font-size: 18px; font-weight: bold; margin: 16px 0 6px 0;">$1</h3>');
+    html = html.replace(/^## (.*$)/gim, '<h2 style="font-family: Helvetica, Arial, sans-serif; font-size: 22px; font-weight: bold; margin: 18px 0 8px 0;">$1</h2>');
+    html = html.replace(/^# (.*$)/gim, '<h1 style="font-family: Helvetica, Arial, sans-serif; font-size: 28px; font-weight: bold; margin: 20px 0 10px 0;">$1</h1>');
+    
+    // Bold with inline style
+    html = html.replace(/\*\*(.+?)\*\*/g, '<strong style="font-weight: bold;">$1</strong>');
+    
+    // Italic
+    html = html.replace(/\*(.+?)\*/g, '<em style="font-style: italic;">$1</em>');
+    
+    // Line breaks
+    html = html.replace(/\n/g, '<br>');
     
     return html;
   };
@@ -801,28 +868,8 @@ export default function GrantWritingTool() {
                     <p className="text-sm text-gray-500 mb-4">
                       Feel free to further customize specific organizational details or statistics relevant to your mission and targeted communities. Thank you for considering our proposal.
                     </p>
-                    
-                    {isEditMode ? (
-                      <textarea
-                        value={generatedGrant}
-                        onChange={(e) => setGeneratedGrant(e.target.value)}
-                        className="w-full h-96 p-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono text-sm resize-y"
-                        placeholder="Your generated grant proposal will appear here..."
-                      />
-                    ) : (
-                      <div 
-                        className="w-full min-h-96 p-8 border border-gray-300 rounded-lg bg-white"
-                        style={{ fontFamily: 'Helvetica, Arial, sans-serif' }}
-                      >
-                        <div 
-                          className="markdown-content"
-                          style={{ fontFamily: 'Helvetica, Arial, sans-serif' }}
-                          dangerouslySetInnerHTML={{ __html: renderMarkdownToHtml(generatedGrant) }}
-                        />
-                      </div>
-                    )}
 
-                    <div className="flex gap-3 mt-4">
+                  <div className="flex gap-3 my-4">
                       <button 
                         onClick={() => setShowPdfPreview(true)}
                         className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center justify-center gap-2"
@@ -864,6 +911,67 @@ export default function GrantWritingTool() {
                         Export as PDF
                       </button>
                     </div>
+                    
+                    {isEditMode ? (
+                      <>
+                        <div className="flex gap-2 mb-2 p-2 bg-gray-50 border border-gray-300 rounded-t-lg">
+                          <button
+                            onClick={() => insertFormatting('**', '**')}
+                            className="p-2 hover:bg-gray-200 rounded transition-colors"
+                            title="Bold"
+                          >
+                            <Bold className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => insertFormatting('*', '*')}
+                            className="p-2 hover:bg-gray-200 rounded transition-colors"
+                            title="Italic"
+                          >
+                            <Italic className="w-4 h-4" />
+                          </button>
+                          <div className="w-px bg-gray-300 mx-1"></div>
+                          <button
+                            onClick={() => insertFormatting('# ', '')}
+                            className="p-2 hover:bg-gray-200 rounded transition-colors"
+                            title="Heading 1"
+                          >
+                            <Heading1 className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => insertFormatting('## ', '')}
+                            className="p-2 hover:bg-gray-200 rounded transition-colors"
+                            title="Heading 2"
+                          >
+                            <Heading2 className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => insertFormatting('### ', '')}
+                            className="p-2 hover:bg-gray-200 rounded transition-colors"
+                            title="Heading 3"
+                          >
+                            <Heading3 className="w-4 h-4" />
+                          </button>
+                        </div>
+                        <textarea
+                          ref={textareaRef}
+                          value={generatedGrant}
+                          onChange={(e) => setGeneratedGrant(e.target.value)}
+                          className="w-full h-96 p-4 border border-gray-300 rounded-b-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono text-sm resize-y"
+                          placeholder="Your generated grant proposal will appear here..."
+                        />
+                      </>
+                    ) : (
+                      <div 
+                        className="w-full min-h-96 p-8 border border-gray-300 rounded-lg bg-white"
+                        style={{ fontFamily: 'Helvetica, Arial, sans-serif' }}
+                      >
+                        <div 
+                          className="markdown-content"
+                          style={{ fontFamily: 'Helvetica, Arial, sans-serif' }}
+                          dangerouslySetInnerHTML={{ __html: renderMarkdownToHtml(generatedGrant) }}
+                        />
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

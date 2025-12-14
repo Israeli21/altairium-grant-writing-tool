@@ -239,7 +239,7 @@ export async function generateGrant(input: GenerateGrantInput): Promise<Generate
     .map((chunk, idx) => `[Document ${idx + 1}]:\n${chunk.content}`)
     .join('\n\n');
 
-  console.log('Step 3: Proposer (OpenAI) drafting grant...');
+  console.log('Step 3: Proposer drafting grant...');
   const proposerPrompt = `You are a grant writing expert. Using the following context from the nonprofit's documents, write a compelling grant proposal addressing this request:
 
 Request: ${userRequest}
@@ -251,7 +251,7 @@ Write a comprehensive grant proposal with clear sections covering the problem, s
 
   const proposerDraft = await callOpenAI(proposerPrompt);
 
-  console.log('Step 4: Challenger (OpenAI) critiquing...');
+  console.log('Step 4: Challenger critiquing...');
   const challengerPrompt = `You are a critical grant reviewer. Review this grant proposal and identify weaknesses, missing information, or areas that need improvement:
 
 Original Request: ${userRequest}
@@ -263,7 +263,7 @@ Provide constructive criticism and suggest specific improvements.`;
 
   const challengerDraft = await callOpenAI(challengerPrompt);
 
-  console.log('Step 5: Referee (OpenAI) synthesizing final grant...');
+  console.log('Step 5: Referee synthesizing final grant...');
   const refereePrompt = `You are the final arbiter synthesizing the best grant proposal. 
 
 Original Request: ${userRequest}
